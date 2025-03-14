@@ -1,13 +1,18 @@
 #include <cmath>
 #include <raylib.h>
+#include <raymath.h>
 
-int cube() {
-  Vector3 points[8] = {
-      {0, 0, 0}, {4, 0, 0}, {4, 0, 4}, {0, 0, 4},
-      {0, 4, 0}, {4, 4, 0}, {4, 4, 4}, {0, 4, 4},
+int cube(float distance, float radius) {
+  Vector3 base[8] = {
+      {0, 0, 0}, {1, 0, 0}, {1, 0, 1}, {0, 0, 1},
+      {0, 1, 0}, {1, 1, 0}, {1, 1, 1}, {0, 1, 1},
   };
+  Vector3 points[8];
   for (int i = 0; i < 8; i++) {
-    DrawSphere((Vector3)points[i], 1.0f, RED);
+    points[i] = Vector3Scale(base[i], distance);
+  }
+  for (int i = 0; i < 8; i++) {
+    DrawSphere((Vector3)points[i], radius, RED);
   };
   for (int i = 0; i < 4; i++) {
     DrawLine3D((Vector3)points[i], (Vector3)points[(i + 1) % 4], BLACK);
@@ -42,7 +47,7 @@ int main() {
     ClearBackground(RAYWHITE);
 
     BeginMode3D(camera);
-    cube();
+    cube(4, 1);
 
     EndMode3D();
 

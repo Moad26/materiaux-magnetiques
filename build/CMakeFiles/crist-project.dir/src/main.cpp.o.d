@@ -85,4 +85,5 @@ CMakeFiles/crist-project.dir/src/main.cpp.o: \
  /usr/include/c++/13/tr1/poly_hermite.tcc \
  /usr/include/c++/13/tr1/poly_laguerre.tcc \
  /usr/include/c++/13/tr1/riemann_zeta.tcc /usr/local/include/raylib.h \
- /usr/lib/gcc/x86_64-linux-gnu/13/include/stdarg.h
+ /usr/lib/gcc/x86_64-linux-gnu/13/include/stdarg.h \
+ /usr/local/include/raymath.h /usr/include/c++/13/math.h
