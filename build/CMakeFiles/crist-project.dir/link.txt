@@ -1,0 +1,1 @@
+/usr/bin/c++ "CMakeFiles/crist-project.dir/src/main.cpp.o" -o crist-project  -lraylib 
