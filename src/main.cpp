@@ -2,14 +2,17 @@
 #include <raylib.h>
 #include <raymath.h>
 
-int cube(float distance, float radius) {
+int cube(float distance, float radius, Vector3 start) {
   Vector3 base[8] = {
       {0, 0, 0}, {1, 0, 0}, {1, 0, 1}, {0, 0, 1},
       {0, 1, 0}, {1, 1, 0}, {1, 1, 1}, {0, 1, 1},
   };
   Vector3 points[8];
+  Vector3 v;
   for (int i = 0; i < 8; i++) {
-    points[i] = Vector3Scale(base[i], distance);
+    v = Vector3Scale(base[i], distance);
+    v = Vector3Add(v, start);
+    points[i] = v;
   }
   for (int i = 0; i < 8; i++) {
     DrawSphere((Vector3)points[i], radius, RED);
@@ -26,16 +29,16 @@ int cube(float distance, float radius) {
 }
 
 int main() {
-  InitWindow(600, 400, "Simulating Structures");
+  InitWindow(1200, 780, "Simulating Structures");
   SetTargetFPS(60);
 
-  Vector3 target = {2, 2, 2};
+  Vector3 target = {10, 10, 10};
 
   // Define the 3D camera
-  Camera3D camera = {{0, 2, 20}, // Position
-                     target,     // Target (where it's looking)
-                     {0, 1, 0},  // Up direction
-                     60.0f,      // Field of view
+  Camera3D camera = {{0, 10, 30}, // Position
+                     target,      // Target (where it's looking)
+                     {0, 1, 0},   // Up direction
+                     60.0f,       // Field of view
                      CAMERA_PERSPECTIVE};
 
   while (!WindowShouldClose()) {
@@ -47,7 +50,9 @@ int main() {
     ClearBackground(RAYWHITE);
 
     BeginMode3D(camera);
-    cube(4, 1);
+    cube(4, 1, target);
+
+    DrawGrid(40,1);
 
     EndMode3D();
 

@@ -27,6 +27,7 @@ CMakeFiles/crist-project.dir/src/main.cpp.o
  /usr/include/c++/13/ext/numeric_traits.h
  /usr/include/c++/13/ext/type_traits.h
  /usr/include/c++/13/limits
+ /usr/include/c++/13/math.h
  /usr/include/c++/13/pstl/pstl_config.h
  /usr/include/c++/13/tr1/bessel_function.tcc
  /usr/include/c++/13/tr1/beta_function.tcc
@@ -101,4 +102,5 @@ CMakeFiles/crist-project.dir/src/main.cpp.o
  /usr/lib/gcc/x86_64-linux-gnu/13/include/stdarg.h
  /usr/lib/gcc/x86_64-linux-gnu/13/include/stddef.h
  /usr/local/include/raylib.h
+ /usr/local/include/raymath.h
 
