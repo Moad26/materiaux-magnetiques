@@ -48,8 +48,8 @@ struct atome {
   Vector3 pos;
   Spin spin = Spin::UP;
   vector<Vector3> neigh;
-  float energy = 0.0;
-  float radius;
+  float energy = 0.0f;
+  float radius = 1.0f;
 };
 
 // now we draw a whole structure
