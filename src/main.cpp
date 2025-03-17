@@ -37,25 +37,26 @@ int cube(float distance, float radius, Vector3 start) {
   return 0;
 }
 
-//we create the values of spin
+// we create the values of spin
 enum class Spin : int {
   UP = 1,
   DOWN = -1,
 };
 
-//we create atom with needed specs
+// we create atom with needed specs
 struct atome {
   Vector3 pos;
   Spin spin = Spin::UP;
   vector<Vector3> neigh;
   float energy = 0.0f;
-  float radius = 1.0f;
+  float radius = 0.5f;
 };
 
 // now we draw a whole structure
 vector<vector<vector<atome>>> make_struc(const int x, const int y, const int z,
                                          const float distance) {
-  vector<vector<vector<atome>>> points;
+  vector<vector<vector<atome>>> points(
+      x, vector<vector<atome>>(y, vector<atome>(z)));
   float pos_x;
   float pos_y;
   float pos_z;
@@ -63,8 +64,8 @@ vector<vector<vector<atome>>> make_struc(const int x, const int y, const int z,
     for (int j = 0; j < y; j++) {
       for (int k = 0; k < z; k++) {
         pos_x = i * distance;
-        pos_y = i * distance;
-        pos_z = i * distance;
+        pos_y = j * distance;
+        pos_z = k * distance;
         points[i][j][k].pos = {pos_x, pos_y, pos_z};
 
         vector<Vector3> neighbors;
@@ -102,6 +103,9 @@ int main() {
                      {0, 1, 0},   // Up direction
                      60.0f,       // Field of view
                      CAMERA_PERSPECTIVE};
+  int N = 5;
+  float distance = 2.0f;
+  auto structure = make_struc(N, N, N, distance);
 
   while (!WindowShouldClose()) {
     // Handle camera movement
@@ -111,7 +115,19 @@ int main() {
     BeginDrawing();
     ClearBackground(RAYWHITE);
 
+    DrawFPS(1000, 10);
     BeginMode3D(camera);
+    for (int i = 0; i < N; i++) {
+      for (int j = 0; j < N; j++) {
+        for (int k = 0; k < N; k++) {
+          DrawSphere(structure[i][j][k].pos, structure[i][j][k].radius, RED);
+
+          for(const auto& neighbor:structure[i][j][k].neigh){
+            DrawLine3D(structure[i][j][k].pos, neighbor, BLACK);
+          }
+        }
+      }
+    }
 
     DrawGrid(40, 1);
 
