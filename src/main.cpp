@@ -56,6 +56,20 @@ vector<vector<vector<atome>>> make_struc(const int x, const int y, const int z,
         pos_y = i * distance;
         pos_z = i * distance;
         points[i][j][k].pos = {pos_x, pos_y, pos_z};
+        vector<Vector3> neighbors;
+
+        if (i > 0)
+          neighbors.push_back({(i - 1) * distance, pos_y, pos_z});
+        if (i < x - 1)
+          neighbors.push_back({(i + 1) * distance, pos_y, pos_z});
+        if (j > 0)
+          neighbors.push_back({pos_x, (j - 1) * distance, pos_z});
+        if (j < y - 1)
+          neighbors.push_back({pos_x, (j + 1) * distance, pos_z});
+        if (k > 0)
+          neighbors.push_back({pos_x, pos_y, (k - 1) * distance});
+        if (k < z - 1)
+          neighbors.push_back({pos_x, pos_y, (k + 1) * distance});
       }
     }
   }
