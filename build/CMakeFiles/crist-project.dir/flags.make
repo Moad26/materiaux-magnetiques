@@ -4,7 +4,7 @@
 # compile CXX with /usr/bin/c++
 CXX_DEFINES = 
 
-CXX_INCLUDES = 
+CXX_INCLUDES = -I/home/moad/desktop/cpp/crist-project/include
 
 CXX_FLAGS = -std=gnu++17
 
