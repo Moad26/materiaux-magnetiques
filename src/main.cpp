@@ -103,7 +103,7 @@ int main() {
                      {0, 1, 0},   // Up direction
                      60.0f,       // Field of view
                      CAMERA_PERSPECTIVE};
-  int N = 5;
+  int N = 2;
   float distance = 2.0f;
   auto structure = make_struc(N, N, N, distance);
 
