@@ -1,6 +1,9 @@
 #include <cmath>
 #include <raylib.h>
 #include <raymath.h>
+#include <vector>
+
+using namespace std;
 
 int cube(float distance, float radius, Vector3 start) {
   Vector3 base[8] = {
@@ -28,6 +31,38 @@ int cube(float distance, float radius, Vector3 start) {
   return 0;
 }
 
+enum class Spin : int {
+  UP = 1,
+  DOWN = -1,
+};
+
+struct atome {
+  Vector3 pos;
+  Spin spin = Spin::UP;
+  vector<Vector3> neigh;
+  float energy = 0.0;
+};
+
+vector<vector<vector<atome>>> make_struc(const int x, const int y, const int z,
+                                         const float distance) {
+  vector<vector<vector<atome>>> points;
+  float pos_x;
+  float pos_y;
+  float pos_z;
+  for (int i = 0; i < x; i++) {
+    for (int j = 0; j < y; j++) {
+      for (int k = 0; k < z; k++) {
+        pos_x = i * distance;
+        pos_y = i * distance;
+        pos_z = i * distance;
+        points[i][j][k].pos = {pos_x, pos_y, pos_z};
+      }
+    }
+  }
+
+  return points;
+}
+
 int main() {
   InitWindow(1200, 780, "Simulating Structures");
   SetTargetFPS(60);
@@ -50,9 +85,8 @@ int main() {
     ClearBackground(RAYWHITE);
 
     BeginMode3D(camera);
-    cube(4, 1, target);
 
-    DrawGrid(40,1);
+    DrawGrid(40, 1);
 
     EndMode3D();
 
