@@ -5,21 +5,27 @@
 
 using namespace std;
 
+// first test of 3d structure in raylib and could be desposed of
 int cube(float distance, float radius, Vector3 start) {
+  // initialise a base array
   Vector3 base[8] = {
       {0, 0, 0}, {1, 0, 0}, {1, 0, 1}, {0, 0, 1},
       {0, 1, 0}, {1, 1, 0}, {1, 1, 1}, {0, 1, 1},
   };
+
   Vector3 points[8];
   Vector3 v;
+  // here we create a array of points with proper distance and starting point
   for (int i = 0; i < 8; i++) {
     v = Vector3Scale(base[i], distance);
     v = Vector3Add(v, start);
     points[i] = v;
   }
+  // we draw the spheres in pos of points
   for (int i = 0; i < 8; i++) {
     DrawSphere((Vector3)points[i], radius, RED);
   };
+  // now we draw links between those shperes
   for (int i = 0; i < 4; i++) {
     DrawLine3D((Vector3)points[i], (Vector3)points[(i + 1) % 4], BLACK);
 
@@ -31,18 +37,22 @@ int cube(float distance, float radius, Vector3 start) {
   return 0;
 }
 
+//we create the values of spin
 enum class Spin : int {
   UP = 1,
   DOWN = -1,
 };
 
+//we create atom with needed specs
 struct atome {
   Vector3 pos;
   Spin spin = Spin::UP;
   vector<Vector3> neigh;
   float energy = 0.0;
+  float radius;
 };
 
+// now we draw a whole structure
 vector<vector<vector<atome>>> make_struc(const int x, const int y, const int z,
                                          const float distance) {
   vector<vector<vector<atome>>> points;
@@ -56,6 +66,7 @@ vector<vector<vector<atome>>> make_struc(const int x, const int y, const int z,
         pos_y = i * distance;
         pos_z = i * distance;
         points[i][j][k].pos = {pos_x, pos_y, pos_z};
+
         vector<Vector3> neighbors;
 
         if (i > 0)
@@ -70,6 +81,8 @@ vector<vector<vector<atome>>> make_struc(const int x, const int y, const int z,
           neighbors.push_back({pos_x, pos_y, (k - 1) * distance});
         if (k < z - 1)
           neighbors.push_back({pos_x, pos_y, (k + 1) * distance});
+
+        points[i][j][k].neigh = neighbors;
       }
     }
   }
