@@ -103,7 +103,7 @@ int main() {
                      {0, 1, 0},   // Up direction
                      60.0f,       // Field of view
                      CAMERA_PERSPECTIVE};
-  int N = 2;
+  int N = 10;
   float distance = 2.0f;
   auto structure = make_struc(N, N, N, distance);
 
@@ -122,7 +122,7 @@ int main() {
         for (int k = 0; k < N; k++) {
           DrawSphere(structure[i][j][k].pos, structure[i][j][k].radius, RED);
 
-          for(const auto& neighbor:structure[i][j][k].neigh){
+          for (const auto &neighbor : structure[i][j][k].neigh) {
             DrawLine3D(structure[i][j][k].pos, neighbor, BLACK);
           }
         }
