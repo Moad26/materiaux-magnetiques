@@ -92,6 +92,7 @@ crist__project_EXTERNAL_OBJECTS =
 
 crist-project: CMakeFiles/crist-project.dir/src/main.cpp.o
 crist-project: CMakeFiles/crist-project.dir/build.make
+crist-project: /usr/local/lib/libraylib.so
 crist-project: CMakeFiles/crist-project.dir/link.txt
 	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --bold --progress-dir=/home/moad/desktop/cpp/crist-project/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_2) "Linking CXX executable crist-project"
 	$(CMAKE_COMMAND) -E cmake_link_script CMakeFiles/crist-project.dir/link.txt --verbose=$(VERBOSE)
