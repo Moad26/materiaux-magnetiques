@@ -66,6 +66,10 @@ int main() {
   Material sphereMaterial = LoadMaterialDefault();
   sphereMaterial.maps[MATERIAL_MAP_DIFFUSE].color = RED;
 
+  Mesh lineMesh = GenMeshCylinder(0.05f, 1.0f, 8);
+  Material lineMaterial = LoadMaterialDefault();
+  lineMaterial.maps[MATERIAL_MAP_DIFFUSE].color = BLACK;
+
   Vector3 target = {10, 10, 10};
 
   // Define the 3D camera
@@ -77,10 +81,6 @@ int main() {
   int N = 10;
   float distance = 2.0f;
   auto structure = make_struc(N, N, N, distance);
-
-  Mesh lineMesh = GenMeshCylinder(0.05f, 1.0f, 8);
-  Material lineMaterial = LoadMaterialDefault();
-  lineMaterial.maps[MATERIAL_MAP_DIFFUSE].color = BLACK;
 
   while (!WindowShouldClose()) {
     // Handle camera movement
