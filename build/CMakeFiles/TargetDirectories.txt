@@ -1,3 +1,0 @@
-/home/moad/desktop/cpp/crist-project/build/CMakeFiles/crist-project.dir
-/home/moad/desktop/cpp/crist-project/build/CMakeFiles/edit_cache.dir
-/home/moad/desktop/cpp/crist-project/build/CMakeFiles/rebuild_cache.dir
