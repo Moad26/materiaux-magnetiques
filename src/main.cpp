@@ -1,41 +1,8 @@
+#include "raylib.h"
+#include "raymath.h"
 #include <cmath>
-#include <raylib.h>
-#include <raymath.h>
 #include <vector>
-
 using namespace std;
-
-// first test of 3d structure in raylib and could be desposed of
-int cube(float distance, float radius, Vector3 start) {
-  // initialise a base array
-  Vector3 base[8] = {
-      {0, 0, 0}, {1, 0, 0}, {1, 0, 1}, {0, 0, 1},
-      {0, 1, 0}, {1, 1, 0}, {1, 1, 1}, {0, 1, 1},
-  };
-
-  Vector3 points[8];
-  Vector3 v;
-  // here we create a array of points with proper distance and starting point
-  for (int i = 0; i < 8; i++) {
-    v = Vector3Scale(base[i], distance);
-    v = Vector3Add(v, start);
-    points[i] = v;
-  }
-  // we draw the spheres in pos of points
-  for (int i = 0; i < 8; i++) {
-    DrawSphere((Vector3)points[i], radius, RED);
-  };
-  // now we draw links between those shperes
-  for (int i = 0; i < 4; i++) {
-    DrawLine3D((Vector3)points[i], (Vector3)points[(i + 1) % 4], BLACK);
-
-    DrawLine3D((Vector3)points[i + 4], (Vector3)points[((i + 1) % 4) + 4],
-               BLACK);
-
-    DrawLine3D((Vector3)points[i], (Vector3)points[i + 4], BLACK);
-  }
-  return 0;
-}
 
 // we create the values of spin
 enum class Spin : int {
@@ -92,8 +59,12 @@ vector<vector<vector<atome>>> make_struc(const int x, const int y, const int z,
 }
 
 int main() {
-  InitWindow(1200, 780, "Simulating Structures");
-  SetTargetFPS(60);
+  InitWindow(1200, 780, "Using GPU instensing");
+  // SetTargetFPS(60);
+
+  Mesh sphereMesh = GenMeshSphere(0.5f, 10, 10);
+  Material sphereMaterial = LoadMaterialDefault();
+  sphereMaterial.maps[MATERIAL_MAP_DIFFUSE].color = RED;
 
   Vector3 target = {10, 10, 10};
 
@@ -106,6 +77,10 @@ int main() {
   int N = 10;
   float distance = 2.0f;
   auto structure = make_struc(N, N, N, distance);
+
+  Mesh lineMesh = GenMeshCylinder(0.05f, 1.0f, 8);
+  Material lineMaterial = LoadMaterialDefault();
+  lineMaterial.maps[MATERIAL_MAP_DIFFUSE].color = BLACK;
 
   while (!WindowShouldClose()) {
     // Handle camera movement
@@ -120,10 +95,27 @@ int main() {
     for (int i = 0; i < N; i++) {
       for (int j = 0; j < N; j++) {
         for (int k = 0; k < N; k++) {
-          DrawSphere(structure[i][j][k].pos, structure[i][j][k].radius, RED);
+          Matrix transform = MatrixTranslate(structure[i][j][k].pos.x,
+                                             structure[i][j][k].pos.y,
+                                             structure[i][j][k].pos.z);
+          DrawMesh(sphereMesh, sphereMaterial, transform);
+          Vector3 posA = structure[i][j][k].pos;
+          for (Vector3 posB : structure[i][j][k].neigh) {
+            Vector3 midPoint = Vector3Scale(Vector3Add(posA, posB), 0.5f);
 
-          for (const auto &neighbor : structure[i][j][k].neigh) {
-            DrawLine3D(structure[i][j][k].pos, neighbor, BLACK);
+            Vector3 dir = Vector3Subtract(posB, posA);
+            float length = Vector3Length(dir);
+
+            Vector3 up = {0.0f, 1.0f, 0.0f};
+            Vector3 axis = Vector3CrossProduct(up, dir);
+            float angle = acos(Vector3DotProduct(up, Vector3Normalize(dir)));
+
+            Matrix rotation = MatrixRotate(axis, angle);
+            Matrix linkTransform = MatrixMultiply(
+                MatrixMultiply(MatrixScale(1.0f, length / 2.0f, 1.0f),
+                               rotation),
+                MatrixTranslate(midPoint.x, midPoint.y, midPoint.z));
+            DrawMesh(lineMesh, lineMaterial, linkTransform);
           }
         }
       }
@@ -136,6 +128,10 @@ int main() {
     DrawText("Use WASD + Mouse to move", 10, 10, 20, DARKGRAY);
     EndDrawing();
   }
+  UnloadMesh(sphereMesh);
+  UnloadMesh(lineMesh);
+  UnloadMaterial(sphereMaterial);
+  UnloadMaterial(lineMaterial);
 
   CloseWindow();
   return 0;

@@ -7,7 +7,7 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
 
 # Include directories
-include_directories(include /usr/local/include)  # Add the local include path for Raylib
+include_directories(include /usr/local/include)
 
 # Define the source files
 file(GLOB_RECURSE SOURCES "src/*.cpp")
