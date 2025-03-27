@@ -1,29 +1,24 @@
 #include "raylib.h"
 #include "raymath.h"
 #include "rlgl.h"
-#include <cmath>
 #include <vector>
 using namespace std;
 
-// we create the values of spin
 enum class Spin : int {
   UP = 1,
   DOWN = -1,
 };
 
-// we create atom with needed specs
-struct atome {
+// Atom struct with reduced memory footprint
+struct Atome {
   Vector3 pos;
   Spin spin = Spin::UP;
-  vector<int> neigh;
-  float energy = 0.0f;
-  float radius = 0.5f;
+  vector<int> neigh; // Stores indices instead of full positions
 };
 
-// now we draw a whole structure
-vector<atome> make_struc(const int x, const int y, const int z,
-                         const float distance) {
-  vector<atome> points(x * y * z);
+// 3D Grid Structure
+vector<Atome> make_struc(int x, int y, int z, float distance) {
+  vector<Atome> points(x * y * z);
   auto getIndex = [=](int i, int j, int k) { return i * y * z + j * z + k; };
 
   for (int i = 0; i < x; i++) {
@@ -51,9 +46,10 @@ vector<atome> make_struc(const int x, const int y, const int z,
   return points;
 }
 
-void DrawInstanced(Mesh mesh, Material material, vector<Matrix> &transfroms) {
+// Draw multiple instances using instanced rendering
+void DrawInstanced(Mesh mesh, Material material, vector<Matrix> &transforms) {
   rlEnableShader(material.shader.id);
-  for (Matrix transform : transfroms) {
+  for (Matrix transform : transforms) {
     rlPushMatrix();
     rlMultMatrixf(MatrixToFloat(transform));
     DrawMesh(mesh, material, MatrixIdentity());
@@ -63,9 +59,9 @@ void DrawInstanced(Mesh mesh, Material material, vector<Matrix> &transfroms) {
 }
 
 int main() {
-  InitWindow(1200, 780, "Using GPU instensing");
-  // SetTargetFPS(60);
+  InitWindow(1200, 780, "Optimized GPU Instancing");
 
+  // Sphere & Cylinder Meshes
   Mesh sphereMesh = GenMeshSphere(0.5f, 10, 10);
   Material sphereMaterial = LoadMaterialDefault();
   sphereMaterial.maps[MATERIAL_MAP_DIFFUSE].color = RED;
@@ -74,37 +70,36 @@ int main() {
   Material lineMaterial = LoadMaterialDefault();
   lineMaterial.maps[MATERIAL_MAP_DIFFUSE].color = BLACK;
 
-  Vector3 target = {10, 10, 10};
+  // Camera setup
+  Camera3D camera = {
+      {0, 10, 30}, {10, 10, 10}, {0, 1, 0}, 60.0f, CAMERA_PERSPECTIVE};
 
-  // Define the 3D camera
-  Camera3D camera = {{0, 10, 30}, // Position
-                     target,      // Target (where it's looking)
-                     {0, 1, 0},   // Up direction
-                     60.0f,       // Field of view
-                     CAMERA_PERSPECTIVE};
+  // Grid Setup
   int N = 10;
   float distance = 2.0f;
   auto structure = make_struc(N, N, N, distance);
 
+  // Precompute transformations for spheres
   vector<Matrix> sphereTransforms;
   for (const auto &atom : structure) {
     sphereTransforms.push_back(
         MatrixTranslate(atom.pos.x, atom.pos.y, atom.pos.z));
   }
 
+  // Main loop
   while (!WindowShouldClose()) {
-    // Handle camera movement
-    UpdateCamera(&camera,
-                 CAMERA_FIRST_PERSON); // Allows movement with WASD & mouse
+    UpdateCamera(&camera, CAMERA_FIRST_PERSON);
 
     BeginDrawing();
     ClearBackground(RAYWHITE);
-
     DrawFPS(1000, 10);
+
     BeginMode3D(camera);
 
+    // Optimized Instanced Rendering
     DrawInstanced(sphereMesh, sphereMaterial, sphereTransforms);
 
+    // Draw Bonds (Lines)
     for (const auto &atom : structure) {
       for (int neighborIdx : atom.neigh) {
         Vector3 posA = atom.pos;
@@ -125,18 +120,21 @@ int main() {
         DrawMesh(lineMesh, lineMaterial, linkTransform);
       }
     }
+
     DrawGrid(40, 1);
 
     EndMode3D();
-
     DrawText("Use WASD + Mouse to move", 10, 10, 20, DARKGRAY);
     EndDrawing();
   }
+
+  // Cleanup
   UnloadMesh(sphereMesh);
   UnloadMesh(lineMesh);
   UnloadMaterial(sphereMaterial);
   UnloadMaterial(lineMaterial);
-
   CloseWindow();
+
   return 0;
 }
+
