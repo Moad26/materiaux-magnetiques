@@ -14,6 +14,8 @@ struct Atome {
   Vector3 pos;
   Spin spin = Spin::UP;
   vector<int> neigh; // Stores indices instead of full positions
+  float energy = 0.0f;
+  float radius = 0.5f;
 };
 
 // 3D Grid Structure
