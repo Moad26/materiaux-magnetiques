@@ -48,6 +48,19 @@ vector<Atome> make_struc(int x, int y, int z, float distance) {
   return points;
 }
 
+// gpu instencing for lines
+void DrawInstancedLines(Mesh lineMesh, Material lineMaterial,
+                        vector<Matrix> &lineTransforms) {
+  rlEnableShader(lineMaterial.shader.id);
+  for (Matrix transfrom : lineTransforms) {
+    rlPushMatrix();
+    rlMultMatrixf(MatrixToFloat(transfrom));
+    DrawMesh(lineMesh, lineMaterial, MatrixIdentity());
+    rlPopMatrix();
+  }
+  rlDisableShader();
+}
+
 // Draw multiple instances using instanced rendering
 void DrawInstanced(Mesh mesh, Material material, vector<Matrix> &transforms) {
   rlEnableShader(material.shader.id);
@@ -88,6 +101,28 @@ int main() {
         MatrixTranslate(atom.pos.x, atom.pos.y, atom.pos.z));
   }
 
+  // Precompute transformations for lines (bonds)
+  vector<Matrix> lineTransforms;
+  for (const auto &atom : structure) {
+    for (int neighborIdx : atom.neigh) {
+      Vector3 posA = atom.pos;
+      Vector3 posB = structure[neighborIdx].pos;
+      Vector3 midPoint = Vector3Scale(Vector3Add(posA, posB), 0.5f);
+
+      Vector3 dir = Vector3Subtract(posB, posA);
+      float length = Vector3Length(dir);
+      Vector3 up = {0.0f, 1.0f, 0.0f};
+      Vector3 axis = Vector3CrossProduct(up, dir);
+      float angle = acos(Vector3DotProduct(up, Vector3Normalize(dir)));
+
+      Matrix rotation = MatrixRotate(axis, angle);
+      Matrix linkTransform = MatrixMultiply(
+          MatrixMultiply(MatrixScale(1.0f, length / 2.0f, 1.0f), rotation),
+          MatrixTranslate(midPoint.x, midPoint.y, midPoint.z));
+      lineTransforms.push_back(linkTransform);
+    }
+  }
+
   // Main loop
   while (!WindowShouldClose()) {
     UpdateCamera(&camera, CAMERA_FIRST_PERSON);
@@ -101,27 +136,7 @@ int main() {
     // Optimized Instanced Rendering
     DrawInstanced(sphereMesh, sphereMaterial, sphereTransforms);
 
-    // Draw Bonds (Lines)
-    for (const auto &atom : structure) {
-      for (int neighborIdx : atom.neigh) {
-        Vector3 posA = atom.pos;
-        Vector3 posB = structure[neighborIdx].pos;
-        Vector3 midPoint = Vector3Scale(Vector3Add(posA, posB), 0.5f);
-
-        Vector3 dir = Vector3Subtract(posB, posA);
-        float length = Vector3Length(dir);
-        Vector3 up = {0.0f, 1.0f, 0.0f};
-        Vector3 axis = Vector3CrossProduct(up, dir);
-        float angle = acos(Vector3DotProduct(up, Vector3Normalize(dir)));
-
-        Matrix rotation = MatrixRotate(axis, angle);
-        Matrix linkTransform = MatrixMultiply(
-            MatrixMultiply(MatrixScale(1.0f, length / 2.0f, 1.0f), rotation),
-            MatrixTranslate(midPoint.x, midPoint.y, midPoint.z));
-
-        DrawMesh(lineMesh, lineMaterial, linkTransform);
-      }
-    }
+    DrawInstancedLines(lineMesh, lineMaterial, lineTransforms);
 
     DrawGrid(40, 1);
 
@@ -139,4 +154,3 @@ int main() {
 
   return 0;
 }
-
