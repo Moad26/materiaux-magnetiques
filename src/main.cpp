@@ -48,17 +48,99 @@ vector<Atome> make_struc(int x, int y, int z, float distance) {
   return points;
 }
 
-// gpu instencing for lines
-void DrawInstancedLines(Mesh lineMesh, Material lineMaterial,
-                        vector<Matrix> &lineTransforms) {
-  rlEnableShader(lineMaterial.shader.id);
-  for (Matrix transfrom : lineTransforms) {
-    rlPushMatrix();
-    rlMultMatrixf(MatrixToFloat(transfrom));
-    DrawMesh(lineMesh, lineMaterial, MatrixIdentity());
-    rlPopMatrix();
-  }
-  rlDisableShader();
+Mesh CreateBakedCylinderLines(const vector<Atome>& structure, float radius = 0.05f, int segments = 8) {
+    // Calculate total needed vertices and triangles
+    int cylinderCount = 0;
+    for (const auto& atom : structure) {
+        for (int neighborIdx : atom.neigh) {
+            if (neighborIdx > &atom - &structure[0]) {
+                cylinderCount++;
+            }
+        }
+    }
+
+    const int vertsPerCylinder = segments * 2; // 2 rings (top and bottom)
+    const int trisPerCylinder = segments * 2;   // 2 triangles per segment
+
+    Mesh mesh = {0};
+    mesh.vertexCount = cylinderCount * vertsPerCylinder;
+    mesh.triangleCount = cylinderCount * trisPerCylinder;
+
+    // Allocate memory
+    mesh.vertices = (float*)RL_MALLOC(mesh.vertexCount * 3 * sizeof(float));
+    mesh.normals = (float*)RL_MALLOC(mesh.vertexCount * 3 * sizeof(float));
+    mesh.texcoords = (float*)RL_MALLOC(mesh.vertexCount * 2 * sizeof(float));
+    mesh.indices = (unsigned short*)RL_MALLOC(mesh.triangleCount * 3 * sizeof(unsigned short));
+
+    int vertexOffset = 0;
+    int indexOffset = 0;
+
+    for (const auto& atom : structure) {
+        for (int neighborIdx : atom.neigh) {
+            if (neighborIdx > &atom - &structure[0]) {
+                Vector3 start = atom.pos;
+                Vector3 end = structure[neighborIdx].pos;
+                Vector3 direction = Vector3Normalize(Vector3Subtract(end, start));
+                float length = Vector3Distance(start, end);
+
+                // Find an arbitrary perpendicular vector
+                Vector3 perp;
+                if (fabs(direction.x) < fabs(direction.y)) {
+                    perp = Vector3Normalize(Vector3CrossProduct(direction, (Vector3){1,0,0}));
+                } else {
+                    perp = Vector3Normalize(Vector3CrossProduct(direction, (Vector3){0,1,0}));
+                }
+
+                // Generate cylinder vertices
+                for (int i = 0; i < segments; i++) {
+                    float angle = 2*PI*i/segments;
+                    Vector3 circleVec = Vector3Scale(Vector3Add(
+                        Vector3Scale(perp, cosf(angle)),
+                        Vector3Scale(Vector3CrossProduct(perp, direction), sinf(angle))
+                    ), radius);
+
+                    // Bottom ring
+                    mesh.vertices[(vertexOffset + i)*3 + 0] = start.x + circleVec.x;
+                    mesh.vertices[(vertexOffset + i)*3 + 1] = start.y + circleVec.y;
+                    mesh.vertices[(vertexOffset + i)*3 + 2] = start.z + circleVec.z;
+                    
+                    // Top ring
+                    mesh.vertices[(vertexOffset + segments + i)*3 + 0] = end.x + circleVec.x;
+                    mesh.vertices[(vertexOffset + segments + i)*3 + 1] = end.y + circleVec.y;
+                    mesh.vertices[(vertexOffset + segments + i)*3 + 2] = end.z + circleVec.z;
+
+                    // Normals (point outward from center)
+                    mesh.normals[(vertexOffset + i)*3 + 0] = circleVec.x/radius;
+                    mesh.normals[(vertexOffset + i)*3 + 1] = circleVec.y/radius;
+                    mesh.normals[(vertexOffset + i)*3 + 2] = circleVec.z/radius;
+                    
+                    mesh.normals[(vertexOffset + segments + i)*3 + 0] = circleVec.x/radius;
+                    mesh.normals[(vertexOffset + segments + i)*3 + 1] = circleVec.y/radius;
+                    mesh.normals[(vertexOffset + segments + i)*3 + 2] = circleVec.z/radius;
+                }
+
+                // Generate indices
+                for (int i = 0; i < segments; i++) {
+                    int next = (i + 1) % segments;
+                    
+                    // Bottom triangle
+                    mesh.indices[indexOffset++] = vertexOffset + i;
+                    mesh.indices[indexOffset++] = vertexOffset + next;
+                    mesh.indices[indexOffset++] = vertexOffset + segments + i;
+                    
+                    // Top triangle
+                    mesh.indices[indexOffset++] = vertexOffset + segments + i;
+                    mesh.indices[indexOffset++] = vertexOffset + next;
+                    mesh.indices[indexOffset++] = vertexOffset + segments + next;
+                }
+
+                vertexOffset += vertsPerCylinder; // Move to the next cylinder's vertices
+            }
+        }
+    }
+
+    UploadMesh(&mesh, false);
+    return mesh;
 }
 
 // Draw multiple instances using instanced rendering
@@ -75,15 +157,6 @@ void DrawInstanced(Mesh mesh, Material material, vector<Matrix> &transforms) {
 
 int main() {
   InitWindow(1200, 780, "Optimized GPU Instancing");
-
-  // Sphere & Cylinder Meshes
-  Mesh sphereMesh = GenMeshSphere(0.5f, 10, 10);
-  Material sphereMaterial = LoadMaterialDefault();
-  sphereMaterial.maps[MATERIAL_MAP_DIFFUSE].color = RED;
-
-  Mesh lineMesh = GenMeshCylinder(0.05f, 1.0f, 8);
-  Material lineMaterial = LoadMaterialDefault();
-  lineMaterial.maps[MATERIAL_MAP_DIFFUSE].color = BLACK;
 
   // Camera setup
   Camera3D camera = {
@@ -123,6 +196,15 @@ int main() {
     }
   }
 
+  // Sphere & Cylinder Meshes
+  Mesh sphereMesh = GenMeshSphere(0.5f, 10, 10);
+  Material sphereMaterial = LoadMaterialDefault();
+  sphereMaterial.maps[MATERIAL_MAP_DIFFUSE].color = RED;
+
+  Mesh bakedLineMesh = CreateBakedCylinderLines(structure);
+  Material lineMaterial = LoadMaterialDefault();
+  lineMaterial.maps[MATERIAL_MAP_DIFFUSE].color = BLACK;
+
   // Main loop
   while (!WindowShouldClose()) {
     UpdateCamera(&camera, CAMERA_FIRST_PERSON);
@@ -135,9 +217,7 @@ int main() {
 
     // Optimized Instanced Rendering
     DrawInstanced(sphereMesh, sphereMaterial, sphereTransforms);
-
-    DrawInstancedLines(lineMesh, lineMaterial, lineTransforms);
-
+    DrawMesh(bakedLineMesh, lineMaterial, MatrixIdentity());
     DrawGrid(40, 1);
 
     EndMode3D();
@@ -147,7 +227,7 @@ int main() {
 
   // Cleanup
   UnloadMesh(sphereMesh);
-  UnloadMesh(lineMesh);
+  UnloadMesh(bakedLineMesh);
   UnloadMaterial(sphereMaterial);
   UnloadMaterial(lineMaterial);
   CloseWindow();
