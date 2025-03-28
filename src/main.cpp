@@ -52,99 +52,111 @@ vector<Atome> make_struc(int x, int y, int z, float distance) {
   return points;
 }
 
-Mesh CreateBakedCylinderLines(const vector<Atome>& structure, float radius = 0.05f, int segments = 8) {
-    // Calculate total needed vertices and triangles
-    int cylinderCount = 0;
-    for (const auto& atom : structure) {
-        for (int neighborIdx : atom.neigh) {
-            if (neighborIdx > &atom - &structure[0]) {
-                cylinderCount++;
-            }
-        }
+Mesh CreateBakedCylinderLines(const vector<Atome> &structure,
+                              float radius = 0.05f, int segments = 8) {
+  // Calculate total needed vertices and triangles
+  int cylinderCount = 0;
+  for (const auto &atom : structure) {
+    for (int neighborIdx : atom.neigh) {
+      if (neighborIdx > &atom - &structure[0]) {
+        cylinderCount++;
+      }
     }
+  }
 
-    const int vertsPerCylinder = segments * 2; // 2 rings (top and bottom)
-    const int trisPerCylinder = segments * 2;   // 2 triangles per segment
+  const int vertsPerCylinder = segments * 2; // 2 rings (top and bottom)
+  const int trisPerCylinder = segments * 2;  // 2 triangles per segment
 
-    Mesh mesh = {0};
-    mesh.vertexCount = cylinderCount * vertsPerCylinder;
-    mesh.triangleCount = cylinderCount * trisPerCylinder;
+  Mesh mesh = {0};
+  mesh.vertexCount = cylinderCount * vertsPerCylinder;
+  mesh.triangleCount = cylinderCount * trisPerCylinder;
 
-    // Allocate memory
-    mesh.vertices = (float*)RL_MALLOC(mesh.vertexCount * 3 * sizeof(float));
-    mesh.normals = (float*)RL_MALLOC(mesh.vertexCount * 3 * sizeof(float));
-    mesh.texcoords = (float*)RL_MALLOC(mesh.vertexCount * 2 * sizeof(float));
-    mesh.indices = (unsigned short*)RL_MALLOC(mesh.triangleCount * 3 * sizeof(unsigned short));
+  // Allocate memory
+  mesh.vertices = (float *)RL_MALLOC(mesh.vertexCount * 3 * sizeof(float));
+  mesh.normals = (float *)RL_MALLOC(mesh.vertexCount * 3 * sizeof(float));
+  mesh.texcoords = (float *)RL_MALLOC(mesh.vertexCount * 2 * sizeof(float));
+  mesh.indices = (unsigned short *)RL_MALLOC(mesh.triangleCount * 3 *
+                                             sizeof(unsigned short));
 
-    int vertexOffset = 0;
-    int indexOffset = 0;
+  int vertexOffset = 0;
+  int indexOffset = 0;
 
-    for (const auto& atom : structure) {
-        for (int neighborIdx : atom.neigh) {
-            if (neighborIdx > &atom - &structure[0]) {
-                Vector3 start = atom.pos;
-                Vector3 end = structure[neighborIdx].pos;
-                Vector3 direction = Vector3Normalize(Vector3Subtract(end, start));
-                float length = Vector3Distance(start, end);
+  for (const auto &atom : structure) {
+    for (int neighborIdx : atom.neigh) {
+      if (neighborIdx > &atom - &structure[0]) {
+        Vector3 start = atom.pos;
+        Vector3 end = structure[neighborIdx].pos;
+        Vector3 direction = Vector3Normalize(Vector3Subtract(end, start));
+        float length = Vector3Distance(start, end);
 
-                // Find an arbitrary perpendicular vector
-                Vector3 perp;
-                if (fabs(direction.x) < fabs(direction.y)) {
-                    perp = Vector3Normalize(Vector3CrossProduct(direction, (Vector3){1,0,0}));
-                } else {
-                    perp = Vector3Normalize(Vector3CrossProduct(direction, (Vector3){0,1,0}));
-                }
-
-                // Generate cylinder vertices
-                for (int i = 0; i < segments; i++) {
-                    float angle = 2*PI*i/segments;
-                    Vector3 circleVec = Vector3Scale(Vector3Add(
-                        Vector3Scale(perp, cosf(angle)),
-                        Vector3Scale(Vector3CrossProduct(perp, direction), sinf(angle))
-                    ), radius);
-
-                    // Bottom ring
-                    mesh.vertices[(vertexOffset + i)*3 + 0] = start.x + circleVec.x;
-                    mesh.vertices[(vertexOffset + i)*3 + 1] = start.y + circleVec.y;
-                    mesh.vertices[(vertexOffset + i)*3 + 2] = start.z + circleVec.z;
-                    
-                    // Top ring
-                    mesh.vertices[(vertexOffset + segments + i)*3 + 0] = end.x + circleVec.x;
-                    mesh.vertices[(vertexOffset + segments + i)*3 + 1] = end.y + circleVec.y;
-                    mesh.vertices[(vertexOffset + segments + i)*3 + 2] = end.z + circleVec.z;
-
-                    // Normals (point outward from center)
-                    mesh.normals[(vertexOffset + i)*3 + 0] = circleVec.x/radius;
-                    mesh.normals[(vertexOffset + i)*3 + 1] = circleVec.y/radius;
-                    mesh.normals[(vertexOffset + i)*3 + 2] = circleVec.z/radius;
-                    
-                    mesh.normals[(vertexOffset + segments + i)*3 + 0] = circleVec.x/radius;
-                    mesh.normals[(vertexOffset + segments + i)*3 + 1] = circleVec.y/radius;
-                    mesh.normals[(vertexOffset + segments + i)*3 + 2] = circleVec.z/radius;
-                }
-
-                // Generate indices
-                for (int i = 0; i < segments; i++) {
-                    int next = (i + 1) % segments;
-                    
-                    // Bottom triangle
-                    mesh.indices[indexOffset++] = vertexOffset + i;
-                    mesh.indices[indexOffset++] = vertexOffset + next;
-                    mesh.indices[indexOffset++] = vertexOffset + segments + i;
-                    
-                    // Top triangle
-                    mesh.indices[indexOffset++] = vertexOffset + segments + i;
-                    mesh.indices[indexOffset++] = vertexOffset + next;
-                    mesh.indices[indexOffset++] = vertexOffset + segments + next;
-                }
-
-                vertexOffset += vertsPerCylinder; // Move to the next cylinder's vertices
-            }
+        // Find an arbitrary perpendicular vector
+        Vector3 perp;
+        if (fabs(direction.x) < fabs(direction.y)) {
+          perp = Vector3Normalize(
+              Vector3CrossProduct(direction, (Vector3){1, 0, 0}));
+        } else {
+          perp = Vector3Normalize(
+              Vector3CrossProduct(direction, (Vector3){0, 1, 0}));
         }
-    }
 
-    UploadMesh(&mesh, false);
-    return mesh;
+        // Generate cylinder vertices
+        for (int i = 0; i < segments; i++) {
+          float angle = 2 * PI * i / segments;
+          Vector3 circleVec = Vector3Scale(
+              Vector3Add(Vector3Scale(perp, cosf(angle)),
+                         Vector3Scale(Vector3CrossProduct(perp, direction),
+                                      sinf(angle))),
+              radius);
+
+          // Bottom ring
+          mesh.vertices[(vertexOffset + i) * 3 + 0] = start.x + circleVec.x;
+          mesh.vertices[(vertexOffset + i) * 3 + 1] = start.y + circleVec.y;
+          mesh.vertices[(vertexOffset + i) * 3 + 2] = start.z + circleVec.z;
+
+          // Top ring
+          mesh.vertices[(vertexOffset + segments + i) * 3 + 0] =
+              end.x + circleVec.x;
+          mesh.vertices[(vertexOffset + segments + i) * 3 + 1] =
+              end.y + circleVec.y;
+          mesh.vertices[(vertexOffset + segments + i) * 3 + 2] =
+              end.z + circleVec.z;
+
+          // Normals (point outward from center)
+          mesh.normals[(vertexOffset + i) * 3 + 0] = circleVec.x / radius;
+          mesh.normals[(vertexOffset + i) * 3 + 1] = circleVec.y / radius;
+          mesh.normals[(vertexOffset + i) * 3 + 2] = circleVec.z / radius;
+
+          mesh.normals[(vertexOffset + segments + i) * 3 + 0] =
+              circleVec.x / radius;
+          mesh.normals[(vertexOffset + segments + i) * 3 + 1] =
+              circleVec.y / radius;
+          mesh.normals[(vertexOffset + segments + i) * 3 + 2] =
+              circleVec.z / radius;
+        }
+
+        // Generate indices
+        for (int i = 0; i < segments; i++) {
+          int next = (i + 1) % segments;
+
+          // Bottom triangle
+          mesh.indices[indexOffset++] = vertexOffset + i;
+          mesh.indices[indexOffset++] = vertexOffset + next;
+          mesh.indices[indexOffset++] = vertexOffset + segments + i;
+
+          // Top triangle
+          mesh.indices[indexOffset++] = vertexOffset + segments + i;
+          mesh.indices[indexOffset++] = vertexOffset + next;
+          mesh.indices[indexOffset++] = vertexOffset + segments + next;
+        }
+
+        vertexOffset +=
+            vertsPerCylinder; // Move to the next cylinder's vertices
+      }
+    }
+  }
+
+  UploadMesh(&mesh, false);
+  return mesh;
 }
 
 // Draw multiple instances using instanced rendering
@@ -161,7 +173,7 @@ void DrawInstanced(Mesh mesh, Material material, vector<Matrix> &transforms) {
 
 int main() {
   // Initialize window
-  InitWindow(1200, 780, "Atom Structure Visualization with ImGui");
+  InitWindow(1920, 1080, "Atom Structure Visualization with ImGui");
 
   // Camera setup
   Camera3D camera = {
@@ -179,7 +191,7 @@ int main() {
   Color sphereColor = RED;
   Color cylinderColor = BLACK;
   bool showGrid = true;
-  
+
   // Create initial structure
   auto structure = make_struc(N, N, N, distance);
 
@@ -195,13 +207,14 @@ int main() {
   Material sphereMaterial = LoadMaterialDefault();
   sphereMaterial.maps[MATERIAL_MAP_DIFFUSE].color = sphereColor;
 
-  Mesh bakedLineMesh = CreateBakedCylinderLines(structure, cylinderRadius, segments);
+  Mesh bakedLineMesh =
+      CreateBakedCylinderLines(structure, cylinderRadius, segments);
   Material lineMaterial = LoadMaterialDefault();
   lineMaterial.maps[MATERIAL_MAP_DIFFUSE].color = cylinderColor;
 
   // Variables for structure rebuilding
   bool needsRebuild = false;
-  
+
   // Main loop
   while (!WindowShouldClose()) {
     UpdateCamera(&camera, CAMERA_FIRST_PERSON);
@@ -209,124 +222,115 @@ int main() {
     // Begin drawing
     BeginDrawing();
     ClearBackground(RAYWHITE);
-    
+
     // ImGui UI
     rlImGuiBegin();
-    
+
     ImGui::Begin("Atom Structure Controls");
-    
+
     // Structure parameters
     bool structureChanged = false;
-    
+
     ImGui::Text("Structure Parameters");
     ImGui::Separator();
-    
+
     if (ImGui::SliderInt("Grid Size", &N, 1, 20)) {
-        structureChanged = true;
+      structureChanged = true;
     }
-    
+
     if (ImGui::SliderFloat("Atom Distance", &distance, 1.0f, 5.0f)) {
-        structureChanged = true;
+      structureChanged = true;
     }
-    
+
     ImGui::Separator();
     ImGui::Text("Visual Parameters");
     ImGui::Separator();
-    
+
     // Visual parameters
     ImGui::SliderFloat("Sphere Radius", &sphereRadius, 0.1f, 1.0f);
     ImGui::SliderFloat("Bond Radius", &cylinderRadius, 0.01f, 0.2f);
     ImGui::SliderInt("Bond Segments", &segments, 3, 16);
-    
+
     // Colors
-    float sphereColorArray[3] = {
-        sphereColor.r / 255.0f, 
-        sphereColor.g / 255.0f, 
-        sphereColor.b / 255.0f
-    };
-    
-    float cylinderColorArray[3] = {
-        cylinderColor.r / 255.0f, 
-        cylinderColor.g / 255.0f, 
-        cylinderColor.b / 255.0f
-    };
-    
+    float sphereColorArray[3] = {sphereColor.r / 255.0f, sphereColor.g / 255.0f,
+                                 sphereColor.b / 255.0f};
+
+    float cylinderColorArray[3] = {cylinderColor.r / 255.0f,
+                                   cylinderColor.g / 255.0f,
+                                   cylinderColor.b / 255.0f};
+
     if (ImGui::ColorEdit3("Sphere Color", sphereColorArray)) {
-        sphereColor = (Color){
-            (unsigned char)(sphereColorArray[0] * 255),
-            (unsigned char)(sphereColorArray[1] * 255),
-            (unsigned char)(sphereColorArray[2] * 255),
-            255
-        };
-        sphereMaterial.maps[MATERIAL_MAP_DIFFUSE].color = sphereColor;
+      sphereColor = (Color){(unsigned char)(sphereColorArray[0] * 255),
+                            (unsigned char)(sphereColorArray[1] * 255),
+                            (unsigned char)(sphereColorArray[2] * 255), 255};
+      sphereMaterial.maps[MATERIAL_MAP_DIFFUSE].color = sphereColor;
     }
-    
+
     if (ImGui::ColorEdit3("Bond Color", cylinderColorArray)) {
-        cylinderColor = (Color){
-            (unsigned char)(cylinderColorArray[0] * 255),
-            (unsigned char)(cylinderColorArray[1] * 255),
-            (unsigned char)(cylinderColorArray[2] * 255),
-            255
-        };
-        lineMaterial.maps[MATERIAL_MAP_DIFFUSE].color = cylinderColor;
+      cylinderColor =
+          (Color){(unsigned char)(cylinderColorArray[0] * 255),
+                  (unsigned char)(cylinderColorArray[1] * 255),
+                  (unsigned char)(cylinderColorArray[2] * 255), 255};
+      lineMaterial.maps[MATERIAL_MAP_DIFFUSE].color = cylinderColor;
     }
-    
+
     ImGui::Checkbox("Show Grid", &showGrid);
-    
+
     if (ImGui::Button("Rebuild Structure") || structureChanged) {
-        needsRebuild = true;
+      needsRebuild = true;
     }
-    
+
     ImGui::Separator();
-    ImGui::Text("Camera Position: (%.1f, %.1f, %.1f)", 
-                camera.position.x, camera.position.y, camera.position.z);
+    ImGui::Text("Camera Position: (%.1f, %.1f, %.1f)", camera.position.x,
+                camera.position.y, camera.position.z);
     ImGui::Text("FPS: %d", GetFPS());
-    
+
     ImGui::End();
-    
+
     // End ImGui frame
     rlImGuiEnd();
-    
+
     // Rebuild structure if needed
     if (needsRebuild) {
-        // Rebuild structure
-        structure = make_struc(N, N, N, distance);
-        
-        // Update sphere transforms
-        sphereTransforms.clear();
-        for (const auto &atom : structure) {
-            sphereTransforms.push_back(
-                MatrixTranslate(atom.pos.x, atom.pos.y, atom.pos.z));
-        }
-        
-        // Update sphere mesh
-        UnloadMesh(sphereMesh);
-        sphereMesh = GenMeshSphere(sphereRadius, 10, 10);
-        
-        // Update bond mesh
-        UnloadMesh(bakedLineMesh);
-        bakedLineMesh = CreateBakedCylinderLines(structure, cylinderRadius, segments);
-        
-        needsRebuild = false;
+      // Rebuild structure
+      structure = make_struc(N, N, N, distance);
+
+      // Update sphere transforms
+      sphereTransforms.clear();
+      for (const auto &atom : structure) {
+        sphereTransforms.push_back(
+            MatrixTranslate(atom.pos.x, atom.pos.y, atom.pos.z));
+      }
+
+      // Update sphere mesh
+      UnloadMesh(sphereMesh);
+      sphereMesh = GenMeshSphere(sphereRadius, 10, 10);
+
+      // Update bond mesh
+      UnloadMesh(bakedLineMesh);
+      bakedLineMesh =
+          CreateBakedCylinderLines(structure, cylinderRadius, segments);
+
+      needsRebuild = false;
     }
-    
+
     // 3D Rendering
     BeginMode3D(camera);
-    
+
     // Draw atoms and bonds
     DrawInstanced(sphereMesh, sphereMaterial, sphereTransforms);
     DrawMesh(bakedLineMesh, lineMaterial, MatrixIdentity());
-    
+
     // Draw grid if enabled
     if (showGrid) {
-        DrawGrid(40, 1);
+      DrawGrid(40, 1);
     }
-    
+
     EndMode3D();
-    
+
     // Instructions
     DrawText("Use WASD + Mouse to move", 10, 10, 20, DARKGRAY);
-    
+
     EndDrawing();
   }
 
