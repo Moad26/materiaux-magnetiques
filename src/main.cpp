@@ -2,6 +2,10 @@
 #include "raymath.h"
 #include "rlgl.h"
 #include <vector>
+// Add ImGui includes
+#include "imgui.h"
+#include "rlImGui.h"
+
 using namespace std;
 
 enum class Spin : int {
@@ -156,15 +160,27 @@ void DrawInstanced(Mesh mesh, Material material, vector<Matrix> &transforms) {
 }
 
 int main() {
-  InitWindow(1200, 780, "Optimized GPU Instancing");
+  // Initialize window
+  InitWindow(1200, 780, "Atom Structure Visualization with ImGui");
 
   // Camera setup
   Camera3D camera = {
       {0, 10, 30}, {10, 10, 10}, {0, 1, 0}, 60.0f, CAMERA_PERSPECTIVE};
 
-  // Grid Setup
+  // Initialize ImGui
+  rlImGuiSetup(true);
+
+  // Grid Setup - make these configurable via ImGui
   int N = 10;
   float distance = 2.0f;
+  float sphereRadius = 0.5f;
+  float cylinderRadius = 0.05f;
+  int segments = 8;
+  Color sphereColor = RED;
+  Color cylinderColor = BLACK;
+  bool showGrid = true;
+  
+  // Create initial structure
   auto structure = make_struc(N, N, N, distance);
 
   // Precompute transformations for spheres
@@ -174,58 +190,148 @@ int main() {
         MatrixTranslate(atom.pos.x, atom.pos.y, atom.pos.z));
   }
 
-  // Precompute transformations for lines (bonds)
-  vector<Matrix> lineTransforms;
-  for (const auto &atom : structure) {
-    for (int neighborIdx : atom.neigh) {
-      Vector3 posA = atom.pos;
-      Vector3 posB = structure[neighborIdx].pos;
-      Vector3 midPoint = Vector3Scale(Vector3Add(posA, posB), 0.5f);
-
-      Vector3 dir = Vector3Subtract(posB, posA);
-      float length = Vector3Length(dir);
-      Vector3 up = {0.0f, 1.0f, 0.0f};
-      Vector3 axis = Vector3CrossProduct(up, dir);
-      float angle = acos(Vector3DotProduct(up, Vector3Normalize(dir)));
-
-      Matrix rotation = MatrixRotate(axis, angle);
-      Matrix linkTransform = MatrixMultiply(
-          MatrixMultiply(MatrixScale(1.0f, length / 2.0f, 1.0f), rotation),
-          MatrixTranslate(midPoint.x, midPoint.y, midPoint.z));
-      lineTransforms.push_back(linkTransform);
-    }
-  }
-
   // Sphere & Cylinder Meshes
-  Mesh sphereMesh = GenMeshSphere(0.5f, 10, 10);
+  Mesh sphereMesh = GenMeshSphere(sphereRadius, 10, 10);
   Material sphereMaterial = LoadMaterialDefault();
-  sphereMaterial.maps[MATERIAL_MAP_DIFFUSE].color = RED;
+  sphereMaterial.maps[MATERIAL_MAP_DIFFUSE].color = sphereColor;
 
-  Mesh bakedLineMesh = CreateBakedCylinderLines(structure);
+  Mesh bakedLineMesh = CreateBakedCylinderLines(structure, cylinderRadius, segments);
   Material lineMaterial = LoadMaterialDefault();
-  lineMaterial.maps[MATERIAL_MAP_DIFFUSE].color = BLACK;
+  lineMaterial.maps[MATERIAL_MAP_DIFFUSE].color = cylinderColor;
 
+  // Variables for structure rebuilding
+  bool needsRebuild = false;
+  
   // Main loop
   while (!WindowShouldClose()) {
     UpdateCamera(&camera, CAMERA_FIRST_PERSON);
 
+    // Begin drawing
     BeginDrawing();
     ClearBackground(RAYWHITE);
-    DrawFPS(1000, 10);
-
+    
+    // ImGui UI
+    rlImGuiBegin();
+    
+    ImGui::Begin("Atom Structure Controls");
+    
+    // Structure parameters
+    bool structureChanged = false;
+    
+    ImGui::Text("Structure Parameters");
+    ImGui::Separator();
+    
+    if (ImGui::SliderInt("Grid Size", &N, 1, 20)) {
+        structureChanged = true;
+    }
+    
+    if (ImGui::SliderFloat("Atom Distance", &distance, 1.0f, 5.0f)) {
+        structureChanged = true;
+    }
+    
+    ImGui::Separator();
+    ImGui::Text("Visual Parameters");
+    ImGui::Separator();
+    
+    // Visual parameters
+    ImGui::SliderFloat("Sphere Radius", &sphereRadius, 0.1f, 1.0f);
+    ImGui::SliderFloat("Bond Radius", &cylinderRadius, 0.01f, 0.2f);
+    ImGui::SliderInt("Bond Segments", &segments, 3, 16);
+    
+    // Colors
+    float sphereColorArray[3] = {
+        sphereColor.r / 255.0f, 
+        sphereColor.g / 255.0f, 
+        sphereColor.b / 255.0f
+    };
+    
+    float cylinderColorArray[3] = {
+        cylinderColor.r / 255.0f, 
+        cylinderColor.g / 255.0f, 
+        cylinderColor.b / 255.0f
+    };
+    
+    if (ImGui::ColorEdit3("Sphere Color", sphereColorArray)) {
+        sphereColor = (Color){
+            (unsigned char)(sphereColorArray[0] * 255),
+            (unsigned char)(sphereColorArray[1] * 255),
+            (unsigned char)(sphereColorArray[2] * 255),
+            255
+        };
+        sphereMaterial.maps[MATERIAL_MAP_DIFFUSE].color = sphereColor;
+    }
+    
+    if (ImGui::ColorEdit3("Bond Color", cylinderColorArray)) {
+        cylinderColor = (Color){
+            (unsigned char)(cylinderColorArray[0] * 255),
+            (unsigned char)(cylinderColorArray[1] * 255),
+            (unsigned char)(cylinderColorArray[2] * 255),
+            255
+        };
+        lineMaterial.maps[MATERIAL_MAP_DIFFUSE].color = cylinderColor;
+    }
+    
+    ImGui::Checkbox("Show Grid", &showGrid);
+    
+    if (ImGui::Button("Rebuild Structure") || structureChanged) {
+        needsRebuild = true;
+    }
+    
+    ImGui::Separator();
+    ImGui::Text("Camera Position: (%.1f, %.1f, %.1f)", 
+                camera.position.x, camera.position.y, camera.position.z);
+    ImGui::Text("FPS: %d", GetFPS());
+    
+    ImGui::End();
+    
+    // End ImGui frame
+    rlImGuiEnd();
+    
+    // Rebuild structure if needed
+    if (needsRebuild) {
+        // Rebuild structure
+        structure = make_struc(N, N, N, distance);
+        
+        // Update sphere transforms
+        sphereTransforms.clear();
+        for (const auto &atom : structure) {
+            sphereTransforms.push_back(
+                MatrixTranslate(atom.pos.x, atom.pos.y, atom.pos.z));
+        }
+        
+        // Update sphere mesh
+        UnloadMesh(sphereMesh);
+        sphereMesh = GenMeshSphere(sphereRadius, 10, 10);
+        
+        // Update bond mesh
+        UnloadMesh(bakedLineMesh);
+        bakedLineMesh = CreateBakedCylinderLines(structure, cylinderRadius, segments);
+        
+        needsRebuild = false;
+    }
+    
+    // 3D Rendering
     BeginMode3D(camera);
-
-    // Optimized Instanced Rendering
+    
+    // Draw atoms and bonds
     DrawInstanced(sphereMesh, sphereMaterial, sphereTransforms);
     DrawMesh(bakedLineMesh, lineMaterial, MatrixIdentity());
-    DrawGrid(40, 1);
-
+    
+    // Draw grid if enabled
+    if (showGrid) {
+        DrawGrid(40, 1);
+    }
+    
     EndMode3D();
+    
+    // Instructions
     DrawText("Use WASD + Mouse to move", 10, 10, 20, DARKGRAY);
+    
     EndDrawing();
   }
 
   // Cleanup
+  rlImGuiShutdown();
   UnloadMesh(sphereMesh);
   UnloadMesh(bakedLineMesh);
   UnloadMaterial(sphereMaterial);
