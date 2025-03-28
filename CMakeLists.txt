@@ -18,6 +18,16 @@ add_executable(crist-project ${SOURCES})
 # Link the Raylib shared library (system-wide installation)
 target_link_libraries(crist-project /usr/local/lib/libraylib.so)
 
+# Link system libraries (GL, m, pthread, etc.)
+target_link_libraries(
+  crist-project
+  GL
+  m
+  pthread
+  dl
+  rt
+  X11)
+
 # Set the output directory for the executable
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
 
