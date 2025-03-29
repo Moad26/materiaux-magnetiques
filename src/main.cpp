@@ -60,24 +60,38 @@ vector<Atome> make_hexagonal_struc(int x, int y, int z, float distance) {
   points.reserve(x * y * z);
 
   float a = distance;
-  float c = a * sqrt(6.0f) / 3.0f;
+  float c = a * 1.2f; // Ideal c/a ratio for HCP
 
-  for (int layer = 0; layer < x; layer++) {
-    float offset = (layer % 2) * (a / 2.0f);
+  for (int layer = 0; layer < z; layer++) {
+    // ABAB stacking pattern
+    bool isLayerB = (layer % 2 == 1);
 
     for (int row = 0; row < y; row++) {
-      float rowOffset = (row % 2) * (a / 2.0f);
-
-      for (int col = 0; col < z; col++) {
+      for (int col = 0; col < x; col++) {
         Atome atom;
-        atom.pos.x = col * a + offset;
+
+        // Base position
+        atom.pos.x = col * a;
         atom.pos.y = row * (a * sqrt(3.0f) / 2.0f);
         atom.pos.z = layer * c;
+
+        // Apply offset for B layers
+        if (isLayerB) {
+          atom.pos.x += a / 2.0f;
+          atom.pos.y += (a * sqrt(3.0f) / 6.0f);
+        }
+
+        // Apply offset for even rows within each layer
+        if (row % 2 == 1) {
+          atom.pos.x += a / 2.0f;
+        }
+
         points.push_back(atom);
       }
     }
   }
 
+  // Establish neighbor connections
   for (size_t i = 0; i < points.size(); i++) {
     points[i].neigh.clear();
 
@@ -86,6 +100,7 @@ vector<Atome> make_hexagonal_struc(int x, int y, int z, float distance) {
         continue;
 
       float dist = Vector3Distance(points[i].pos, points[j].pos);
+      // In HCP, the nearest neighbor distance is exactly 'a'
       if (dist <= a * 1.1f) {
         points[i].neigh.push_back(static_cast<int>(j));
       }
@@ -97,24 +112,48 @@ vector<Atome> make_hexagonal_struc(int x, int y, int z, float distance) {
 
 vector<Atome> make_fcc_struc(int x, int y, int z, float distance) {
   vector<Atome> points;
-  points.reserve(4 * x * y * z); // FCC has 4 atoms per unit cell
 
+  // In FCC, we want to avoid duplicates at the boundaries
   float a = distance; // lattice constant
 
+  // Create a 3D grid to track atom positions
+  const float tolerance = 0.01f * a;
+  auto isNearExistingAtom = [&points, tolerance](const Vector3 &pos) {
+    for (const auto &atom : points) {
+      if (Vector3Distance(atom.pos, pos) < tolerance) {
+        return true;
+      }
+    }
+    return false;
+  };
+
+  // Generate atoms for each unit cell
   for (int i = 0; i < x; i++) {
     for (int j = 0; j < y; j++) {
       for (int k = 0; k < z; k++) {
-        // Base positions for FCC unit cell
         Vector3 basePos = {i * a, j * a, k * a};
 
-        // Add the 4 atoms of the FCC unit cell
-        points.push_back({basePos}); // Corner (0,0,0)
-        points.push_back(
-            {{basePos.x + a / 2, basePos.y + a / 2, basePos.z}}); // Face center
-        points.push_back(
-            {{basePos.x + a / 2, basePos.y, basePos.z + a / 2}}); // Face center
-        points.push_back(
-            {{basePos.x, basePos.y + a / 2, basePos.z + a / 2}}); // Face center
+        // Corner atom (0,0,0)
+        Vector3 pos = basePos;
+        if (!isNearExistingAtom(pos)) {
+          Atome atom;
+          atom.pos = pos;
+          points.push_back(atom);
+        }
+
+        // Face centers
+        Vector3 facePositions[] = {
+            {basePos.x + a / 2, basePos.y + a / 2, basePos.z},
+            {basePos.x + a / 2, basePos.y, basePos.z + a / 2},
+            {basePos.x, basePos.y + a / 2, basePos.z + a / 2}};
+
+        for (const auto &facePos : facePositions) {
+          if (!isNearExistingAtom(facePos)) {
+            Atome atom;
+            atom.pos = facePos;
+            points.push_back(atom);
+          }
+        }
       }
     }
   }
@@ -128,8 +167,8 @@ vector<Atome> make_fcc_struc(int x, int y, int z, float distance) {
         continue;
 
       float dist = Vector3Distance(points[i].pos, points[j].pos);
-      if (dist <=
-          a * 0.71f) { // nearest neighbor distance in FCC is a/sqrt(2) ≈ 0.707a
+      // Nearest neighbor distance in FCC is a/√2 ≈ 0.707a
+      if (dist <= a * 0.75f) {
         points[i].neigh.push_back(static_cast<int>(j));
       }
     }
@@ -140,20 +179,42 @@ vector<Atome> make_fcc_struc(int x, int y, int z, float distance) {
 
 vector<Atome> make_bcc_struc(int x, int y, int z, float distance) {
   vector<Atome> points;
-  points.reserve(2 * x * y * z); // BCC has 2 atoms per unit cell
 
   float a = distance; // lattice constant
 
+  // Create a 3D grid to track atom positions
+  const float tolerance = 0.01f * a;
+  auto isNearExistingAtom = [&points, tolerance](const Vector3 &pos) {
+    for (const auto &atom : points) {
+      if (Vector3Distance(atom.pos, pos) < tolerance) {
+        return true;
+      }
+    }
+    return false;
+  };
+
+  // Generate atoms for each unit cell
   for (int i = 0; i < x; i++) {
     for (int j = 0; j < y; j++) {
       for (int k = 0; k < z; k++) {
-        // Base positions for BCC unit cell
         Vector3 basePos = {i * a, j * a, k * a};
 
-        // Add the 2 atoms of the BCC unit cell
-        points.push_back({basePos}); // Corner (0,0,0)
-        points.push_back({{basePos.x + a / 2, basePos.y + a / 2,
-                           basePos.z + a / 2}}); // Body center
+        // Corner atom (0,0,0)
+        Vector3 pos = basePos;
+        if (!isNearExistingAtom(pos)) {
+          Atome atom;
+          atom.pos = pos;
+          points.push_back(atom);
+        }
+
+        // Body center
+        Vector3 centerPos = {basePos.x + a / 2, basePos.y + a / 2,
+                             basePos.z + a / 2};
+        if (!isNearExistingAtom(centerPos)) {
+          Atome atom;
+          atom.pos = centerPos;
+          points.push_back(atom);
+        }
       }
     }
   }
@@ -167,8 +228,8 @@ vector<Atome> make_bcc_struc(int x, int y, int z, float distance) {
         continue;
 
       float dist = Vector3Distance(points[i].pos, points[j].pos);
-      if (dist <= a * 0.87f) { // nearest neighbor distance in BCC is
-                               // a*sqrt(3)/2 ≈ 0.866a
+      // Nearest neighbor distance in BCC is a*√3/2 ≈ 0.866a
+      if (dist <= a * 0.9f) {
         points[i].neigh.push_back(static_cast<int>(j));
       }
     }
@@ -543,11 +604,11 @@ int main() {
     ImGui::Separator();
 
     bool structureChanged = false;
-    if (ImGui::SliderInt("Grid Size X", &N, 1, 20))
+    if (ImGui::SliderInt("Grid Size X", &N, 1, 10))
       structureChanged = true;
-    if (ImGui::SliderInt("Grid Size Y", &O, 1, 20))
+    if (ImGui::SliderInt("Grid Size Y", &O, 1, 10))
       structureChanged = true;
-    if (ImGui::SliderInt("Grid Size Z", &P, 1, 20))
+    if (ImGui::SliderInt("Grid Size Z", &P, 1, 10))
       structureChanged = true;
     if (ImGui::SliderFloat("Atom Distance", &distance, 1.0f, 5.0f))
       structureChanged = true;
