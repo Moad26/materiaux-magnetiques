@@ -29,6 +29,9 @@
 # ImGui generated configs (if modified during runtime)
 imgui.ini
 
+# Ignore CMake API reply files
+.cmake/api/v1/reply
+
 # Dependency directories
 /deps/
 /vendor/
