@@ -12,6 +12,11 @@ enum class Spin : int {
   DOWN = -1,
 };
 
+enum class StructureType {
+  CUBIC,
+  HEXAGONAL,
+};
+
 struct Atome {
   Vector3 pos;
   Spin spin = Spin::UP;
@@ -20,7 +25,7 @@ struct Atome {
   float radius = 0.5f;
 };
 
-vector<Atome> make_struc(int x, int y, int z, float distance) {
+vector<Atome> make_cubic_struc(int x, int y, int z, float distance) {
   vector<Atome> points(x * y * z);
   auto getIndex = [=](int i, int j, int k) { return i * y * z + j * z + k; };
 
@@ -45,6 +50,46 @@ vector<Atome> make_struc(int x, int y, int z, float distance) {
       }
     }
   }
+  return points;
+}
+
+vector<Atome> make_hexagonal_struc(int x, int y, int z, float distance) {
+  vector<Atome> points;
+  points.reserve(x * y * z);
+
+  float a = distance;
+  float c = a * sqrt(6.0f) / 3.0f;
+
+  for (int layer = 0; layer < x; layer++) {
+    float offset = (layer % 2) * (a / 2.0f);
+
+    for (int row = 0; row < y; row++) {
+      float rowOffset = (row % 2) * (a / 2.0f);
+
+      for (int col = 0; col < z; col++) {
+        Atome atom;
+        atom.pos.x = col * a + offset;
+        atom.pos.y = row * (a * sqrt(3.0f) / 2.0f);
+        atom.pos.z = layer * c;
+        points.push_back(atom);
+      }
+    }
+  }
+
+  for (size_t i = 0; i < points.size(); i++) {
+    points[i].neigh.clear();
+
+    for (size_t j = 0; j < points.size(); j++) {
+      if (i == j)
+        continue;
+
+      float dist = Vector3Distance(points[i].pos, points[j].pos);
+      if (dist <= a * 1.1f) {
+        points[i].neigh.push_back(static_cast<int>(j));
+      }
+    }
+  }
+
   return points;
 }
 
@@ -294,8 +339,12 @@ int main() {
   float movementSpeed = 10.0f; // Units per second
   float cameraSensitivity = 0.3f;
 
+  StructureType currentStructure = StructureType ::CUBIC;
+  const char *structureTypes[] = {"Cubic", "Hexagonal"};
+  int currentStructureType = 0;
+
   // Initialize structure
-  auto structure = make_struc(N, O, P, distance);
+  auto structure = make_cubic_struc(N, O, P, distance);
   vector<Matrix> sphereTransforms;
   for (const auto &atom : structure) {
     sphereTransforms.push_back(
@@ -417,7 +466,9 @@ int main() {
       structureChanged = true;
     if (ImGui::SliderFloat("Atom Distance", &distance, 1.0f, 5.0f))
       structureChanged = true;
-
+    ImGui::Combo("Structure Type", &currentStructureType, structureTypes,
+                 IM_ARRAYSIZE(structureTypes));
+    currentStructure = static_cast<StructureType>(currentStructureType);
     ImGui::Separator();
     ImGui::Text("Visual Parameters");
     ImGui::Separator();
@@ -467,14 +518,16 @@ int main() {
 
     // Rebuild if needed
     if (needsRebuild) {
-      structure = make_struc(N, O, P, distance);
-
+      if (currentStructure == StructureType::CUBIC) {
+        structure = make_cubic_struc(N, O, P, distance);
+      } else {
+        structure = make_hexagonal_struc(N, O, P, distance);
+      }
       sphereTransforms.clear();
       for (const auto &atom : structure) {
         sphereTransforms.push_back(
             MatrixTranslate(atom.pos.x, atom.pos.y, atom.pos.z));
       }
-
       UnloadMesh(sphereMesh);
       sphereMesh = GenMeshSphere(sphereRadius, 16, 16);
 
@@ -483,7 +536,6 @@ int main() {
 
       needsRebuild = false;
     }
-
     EndDrawing();
   }
 
