@@ -48,105 +48,112 @@ vector<Atome> make_struc(int x, int y, int z, float distance) {
   return points;
 }
 
-vector<Mesh> CreateChunkedCylinderLines(const vector<Atome>& structure,
-                                      float radius = 0.05f, int segments = 8,
-                                      int maxCylindersPerChunk = 1000) {
-    vector<Mesh> meshChunks;
-    vector<vector<pair<Vector3, Vector3>>> chunks; // Stores start/end points for each chunk
+vector<Mesh> CreateChunkedCylinderLines(const vector<Atome> &structure,
+                                        float radius = 0.05f, int segments = 8,
+                                        int maxCylindersPerChunk = 1000) {
+  vector<Mesh> meshChunks;
+  vector<vector<pair<Vector3, Vector3>>>
+      chunks; // Stores start/end points for each chunk
 
-    // First collect all cylinder pairs
-    vector<pair<Vector3, Vector3>> allCylinders;
-    for (const auto& atom : structure) {
-        for (int neighborIdx : atom.neigh) {
-            if (neighborIdx > &atom - &structure[0]) {
-                allCylinders.emplace_back(atom.pos, structure[neighborIdx].pos);
-            }
-        }
+  // First collect all cylinder pairs
+  vector<pair<Vector3, Vector3>> allCylinders;
+  for (const auto &atom : structure) {
+    for (int neighborIdx : atom.neigh) {
+      if (neighborIdx > &atom - &structure[0]) {
+        allCylinders.emplace_back(atom.pos, structure[neighborIdx].pos);
+      }
+    }
+  }
+
+  // Split into chunks
+  for (size_t i = 0; i < allCylinders.size(); i += maxCylindersPerChunk) {
+    auto start = allCylinders.begin() + i;
+    auto end = (i + maxCylindersPerChunk) < allCylinders.size()
+                   ? start + maxCylindersPerChunk
+                   : allCylinders.end();
+    chunks.emplace_back(start, end);
+  }
+
+  // Create a mesh for each chunk
+  for (const auto &chunk : chunks) {
+    const int vertsPerCylinder = segments * 2;
+    const int trisPerCylinder = segments * 2;
+
+    Mesh mesh = {0};
+    mesh.vertexCount = chunk.size() * vertsPerCylinder;
+    mesh.triangleCount = chunk.size() * trisPerCylinder;
+
+    mesh.vertices = (float *)RL_MALLOC(mesh.vertexCount * 3 * sizeof(float));
+    mesh.normals = (float *)RL_MALLOC(mesh.vertexCount * 3 * sizeof(float));
+    mesh.texcoords = (float *)RL_MALLOC(mesh.vertexCount * 2 * sizeof(float));
+    mesh.indices = (unsigned short *)RL_MALLOC(mesh.triangleCount * 3 *
+                                               sizeof(unsigned short));
+
+    int vertexOffset = 0;
+    int indexOffset = 0;
+
+    for (const auto &[start, end] : chunk) {
+      Vector3 direction = Vector3Normalize(Vector3Subtract(end, start));
+      Vector3 perp =
+          (fabs(direction.x) < fabs(direction.y))
+              ? Vector3Normalize(Vector3CrossProduct(direction, {1, 0, 0}))
+              : Vector3Normalize(Vector3CrossProduct(direction, {0, 1, 0}));
+
+      // Generate cylinder vertices
+      for (int i = 0; i < segments; i++) {
+        float angle = 2 * PI * i / segments;
+        Vector3 circleVec = Vector3Scale(
+            Vector3Add(Vector3Scale(perp, cosf(angle)),
+                       Vector3Scale(Vector3CrossProduct(perp, direction),
+                                    sinf(angle))),
+            radius);
+
+        // Bottom ring
+        mesh.vertices[(vertexOffset + i) * 3 + 0] = start.x + circleVec.x;
+        mesh.vertices[(vertexOffset + i) * 3 + 1] = start.y + circleVec.y;
+        mesh.vertices[(vertexOffset + i) * 3 + 2] = start.z + circleVec.z;
+
+        // Top ring
+        mesh.vertices[(vertexOffset + segments + i) * 3 + 0] =
+            end.x + circleVec.x;
+        mesh.vertices[(vertexOffset + segments + i) * 3 + 1] =
+            end.y + circleVec.y;
+        mesh.vertices[(vertexOffset + segments + i) * 3 + 2] =
+            end.z + circleVec.z;
+
+        // Normals
+        Vector3 normal = Vector3Normalize(circleVec);
+        mesh.normals[(vertexOffset + i) * 3 + 0] = normal.x;
+        mesh.normals[(vertexOffset + i) * 3 + 1] = normal.y;
+        mesh.normals[(vertexOffset + i) * 3 + 2] = normal.z;
+        mesh.normals[(vertexOffset + segments + i) * 3 + 0] = normal.x;
+        mesh.normals[(vertexOffset + segments + i) * 3 + 1] = normal.y;
+        mesh.normals[(vertexOffset + segments + i) * 3 + 2] = normal.z;
+      }
+
+      // Generate cylinder indices
+      for (int i = 0; i < segments; i++) {
+        int next = (i + 1) % segments;
+
+        // Bottom triangle
+        mesh.indices[indexOffset++] = vertexOffset + i;
+        mesh.indices[indexOffset++] = vertexOffset + next;
+        mesh.indices[indexOffset++] = vertexOffset + segments + i;
+
+        // Top triangle
+        mesh.indices[indexOffset++] = vertexOffset + segments + i;
+        mesh.indices[indexOffset++] = vertexOffset + next;
+        mesh.indices[indexOffset++] = vertexOffset + segments + next;
+      }
+
+      vertexOffset += vertsPerCylinder;
     }
 
-    // Split into chunks
-    for (size_t i = 0; i < allCylinders.size(); i += maxCylindersPerChunk) {
-        auto start = allCylinders.begin() + i;
-        auto end = (i + maxCylindersPerChunk) < allCylinders.size() 
-                 ? start + maxCylindersPerChunk 
-                 : allCylinders.end();
-        chunks.emplace_back(start, end);
-    }
+    UploadMesh(&mesh, false);
+    meshChunks.push_back(mesh);
+  }
 
-    // Create a mesh for each chunk
-    for (const auto& chunk : chunks) {
-        const int vertsPerCylinder = segments * 2;
-        const int trisPerCylinder = segments * 2;
-        
-        Mesh mesh = {0};
-        mesh.vertexCount = chunk.size() * vertsPerCylinder;
-        mesh.triangleCount = chunk.size() * trisPerCylinder;
-
-        mesh.vertices = (float*)RL_MALLOC(mesh.vertexCount * 3 * sizeof(float));
-        mesh.normals = (float*)RL_MALLOC(mesh.vertexCount * 3 * sizeof(float));
-        mesh.texcoords = (float*)RL_MALLOC(mesh.vertexCount * 2 * sizeof(float));
-        mesh.indices = (unsigned short*)RL_MALLOC(mesh.triangleCount * 3 * sizeof(unsigned short));
-
-        int vertexOffset = 0;
-        int indexOffset = 0;
-
-        for (const auto& [start, end] : chunk) {
-            Vector3 direction = Vector3Normalize(Vector3Subtract(end, start));
-            Vector3 perp = (fabs(direction.x) < fabs(direction.y))
-                ? Vector3Normalize(Vector3CrossProduct(direction, {1, 0, 0}))
-                : Vector3Normalize(Vector3CrossProduct(direction, {0, 1, 0}));
-
-            // Generate cylinder vertices
-            for (int i = 0; i < segments; i++) {
-                float angle = 2 * PI * i / segments;
-                Vector3 circleVec = Vector3Scale(
-                    Vector3Add(Vector3Scale(perp, cosf(angle)),
-                             Vector3Scale(Vector3CrossProduct(perp, direction), sinf(angle))),
-                    radius);
-
-                // Bottom ring
-                mesh.vertices[(vertexOffset + i) * 3 + 0] = start.x + circleVec.x;
-                mesh.vertices[(vertexOffset + i) * 3 + 1] = start.y + circleVec.y;
-                mesh.vertices[(vertexOffset + i) * 3 + 2] = start.z + circleVec.z;
-
-                // Top ring
-                mesh.vertices[(vertexOffset + segments + i) * 3 + 0] = end.x + circleVec.x;
-                mesh.vertices[(vertexOffset + segments + i) * 3 + 1] = end.y + circleVec.y;
-                mesh.vertices[(vertexOffset + segments + i) * 3 + 2] = end.z + circleVec.z;
-
-                // Normals
-                Vector3 normal = Vector3Normalize(circleVec);
-                mesh.normals[(vertexOffset + i) * 3 + 0] = normal.x;
-                mesh.normals[(vertexOffset + i) * 3 + 1] = normal.y;
-                mesh.normals[(vertexOffset + i) * 3 + 2] = normal.z;
-                mesh.normals[(vertexOffset + segments + i) * 3 + 0] = normal.x;
-                mesh.normals[(vertexOffset + segments + i) * 3 + 1] = normal.y;
-                mesh.normals[(vertexOffset + segments + i) * 3 + 2] = normal.z;
-            }
-
-            // Generate cylinder indices
-            for (int i = 0; i < segments; i++) {
-                int next = (i + 1) % segments;
-
-                // Bottom triangle
-                mesh.indices[indexOffset++] = vertexOffset + i;
-                mesh.indices[indexOffset++] = vertexOffset + next;
-                mesh.indices[indexOffset++] = vertexOffset + segments + i;
-
-                // Top triangle
-                mesh.indices[indexOffset++] = vertexOffset + segments + i;
-                mesh.indices[indexOffset++] = vertexOffset + next;
-                mesh.indices[indexOffset++] = vertexOffset + segments + next;
-            }
-
-            vertexOffset += vertsPerCylinder;
-        }
-
-        UploadMesh(&mesh, false);
-        meshChunks.push_back(mesh);
-    }
-
-    return meshChunks;
+  return meshChunks;
 }
 
 Mesh CreateBakedCylinderLines(const vector<Atome> &structure,
@@ -258,6 +265,7 @@ void DrawInstanced(Mesh mesh, Material material, vector<Matrix> &transforms) {
 int main() {
   // Window setup
   InitWindow(1920, 1080, "Atom Structure Visualization");
+  SetTargetFPS(60);
   rlImGuiSetup(true);
 
   // Camera setup
@@ -281,9 +289,9 @@ int main() {
   bool showGrid = true;
   bool needsRebuild = false;
 
-  // Camera control
+  // Camera control parameters
   Vector2 cameraAngle = {0};
-  float cameraSpeed = 0.1f;
+  float movementSpeed = 10.0f; // Units per second
   float cameraSensitivity = 0.3f;
 
   // Initialize structure
@@ -312,62 +320,74 @@ int main() {
   style.WindowMinSize = ImVec2(500, 1000); // Minimum window size
   // Main loop
   while (!WindowShouldClose()) {
-    // Camera rotation
+
+    // Get frame timing for consistent movement speed
+    float deltaTime = GetFrameTime();
+    float currentSpeed = movementSpeed * deltaTime;
+
+    // Get ImGui IO for mouse capture check
     ImGuiIO &io = ImGui::GetIO();
 
-    Vector2 mouseDelta = {0};
-    if (!io.WantCaptureMouse || !ImGui::IsAnyItemActive()) {
-      if (IsMouseButtonDown(MOUSE_LEFT_BUTTON)) {
-        mouseDelta = GetMouseDelta();
-        HideCursor();
-      } else {
-        ShowCursor();
-      }
-    }
-    cameraAngle.x -= mouseDelta.y * cameraSensitivity;
-    cameraAngle.y -= mouseDelta.x * cameraSensitivity;
-    cameraAngle.x = Clamp(cameraAngle.x, -89.0f, 89.0f);
-
-    // Calculate direction
-    Vector3 direction = {
-        cosf(DEG2RAD * cameraAngle.y) * cosf(DEG2RAD * cameraAngle.x),
-        sinf(DEG2RAD * cameraAngle.x),
-        sinf(DEG2RAD * cameraAngle.y) * cosf(DEG2RAD * cameraAngle.x)};
-    direction = Vector3Normalize(direction);
-
-    // Movement
+    // Movement direction in camera space
     Vector3 moveDir = {0};
     if (IsKeyDown(KEY_W) || IsKeyDown(KEY_Z))
-      moveDir.z = 1;
+      moveDir.z += 1.0f;
     if (IsKeyDown(KEY_S))
-      moveDir.z = -1;
+      moveDir.z -= 1.0f;
     if (IsKeyDown(KEY_D))
-      moveDir.x = 1;
+      moveDir.x += 1.0f;
     if (IsKeyDown(KEY_A) || IsKeyDown(KEY_Q))
-      moveDir.x = -1;
+      moveDir.x -= 1.0f;
+    if (IsKeyDown(KEY_SPACE))
+      moveDir.y += 1.0f;
+    if (IsKeyDown(KEY_LEFT_CONTROL))
+      moveDir.y -= 1.0f;
 
-    if (Vector3Length(moveDir) > 0) {
+    // Normalize if we're moving in multiple directions
+    if (Vector3Length(moveDir) > 0.0f) {
       moveDir = Vector3Normalize(moveDir);
     }
 
-    // Apply movement
-    Vector3 forward = {direction.x, 0, direction.z};
-    forward = Vector3Normalize(forward);
-    Vector3 right = Vector3CrossProduct(forward, camera.up);
+    // Calculate camera orientation vectors
+    Vector3 forward =
+        Vector3Normalize(Vector3Subtract(camera.target, camera.position));
+    Vector3 right = Vector3Normalize(Vector3CrossProduct(forward, camera.up));
+    Vector3 up = camera.up;
 
-    camera.position = Vector3Add(
-        camera.position, Vector3Scale(forward, moveDir.z * cameraSpeed));
-    camera.position = Vector3Add(camera.position,
-                                 Vector3Scale(right, moveDir.x * cameraSpeed));
+    // Apply movement relative to camera orientation
+    Vector3 movement = Vector3Zero();
+    movement =
+        Vector3Add(movement, Vector3Scale(forward, moveDir.z * currentSpeed));
+    movement =
+        Vector3Add(movement, Vector3Scale(right, moveDir.x * currentSpeed));
+    movement = Vector3Add(movement, Vector3Scale(up, moveDir.y * currentSpeed));
 
-    // Vertical movement
-    if (IsKeyDown(KEY_SPACE))
-      camera.position.y += cameraSpeed;
-    if (IsKeyDown(KEY_LEFT_CONTROL))
-      camera.position.y -= cameraSpeed;
+    // Apply movement to position
+    camera.position = Vector3Add(camera.position, movement);
+    camera.target = Vector3Add(camera.target, movement);
 
-    // Update camera target
-    camera.target = Vector3Add(camera.position, direction);
+    // Update camera look direction based on mouse input
+    if (IsMouseButtonDown(MOUSE_LEFT_BUTTON) &&
+        (!io.WantCaptureMouse || !ImGui::IsAnyItemActive())) {
+      Vector2 mouseDelta = GetMouseDelta();
+
+      cameraAngle.x -= mouseDelta.y * cameraSensitivity * deltaTime * 60.0f;
+      cameraAngle.y -= mouseDelta.x * cameraSensitivity * deltaTime * 60.0f;
+      cameraAngle.x = Clamp(cameraAngle.x, -89.0f, 89.0f);
+
+      // Calculate the new forward direction
+      Vector3 newForward = {
+          cosf(DEG2RAD * cameraAngle.y) * cosf(DEG2RAD * cameraAngle.x),
+          sinf(DEG2RAD * cameraAngle.x),
+          sinf(DEG2RAD * cameraAngle.y) * cosf(DEG2RAD * cameraAngle.x)};
+
+      // Update camera target based on the new direction
+      camera.target = Vector3Add(camera.position, newForward);
+
+      HideCursor();
+    } else {
+      ShowCursor();
+    }
 
     // Rendering
     BeginDrawing();
@@ -427,6 +447,12 @@ int main() {
     }
 
     ImGui::Checkbox("Show Grid", &showGrid);
+
+    ImGui::Separator();
+    ImGui::Text("Camera Settings");
+    ImGui::Separator();
+    ImGui::SliderFloat("Movement Speed", &movementSpeed, 1.0f, 30.0f);
+    ImGui::SliderFloat("Camera Sensitivity", &cameraSensitivity, 0.1f, 1.0f);
 
     if (ImGui::Button("Rebuild Structure") || structureChanged) {
       needsRebuild = true;
