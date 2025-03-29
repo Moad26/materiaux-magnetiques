@@ -15,6 +15,8 @@ enum class Spin : int {
 enum class StructureType {
   CUBIC,
   HEXAGONAL,
+  FCC,
+  BCC,
 };
 
 struct Atome {
@@ -85,6 +87,88 @@ vector<Atome> make_hexagonal_struc(int x, int y, int z, float distance) {
 
       float dist = Vector3Distance(points[i].pos, points[j].pos);
       if (dist <= a * 1.1f) {
+        points[i].neigh.push_back(static_cast<int>(j));
+      }
+    }
+  }
+
+  return points;
+}
+
+vector<Atome> make_fcc_struc(int x, int y, int z, float distance) {
+  vector<Atome> points;
+  points.reserve(4 * x * y * z); // FCC has 4 atoms per unit cell
+
+  float a = distance; // lattice constant
+
+  for (int i = 0; i < x; i++) {
+    for (int j = 0; j < y; j++) {
+      for (int k = 0; k < z; k++) {
+        // Base positions for FCC unit cell
+        Vector3 basePos = {i * a, j * a, k * a};
+
+        // Add the 4 atoms of the FCC unit cell
+        points.push_back({basePos}); // Corner (0,0,0)
+        points.push_back(
+            {{basePos.x + a / 2, basePos.y + a / 2, basePos.z}}); // Face center
+        points.push_back(
+            {{basePos.x + a / 2, basePos.y, basePos.z + a / 2}}); // Face center
+        points.push_back(
+            {{basePos.x, basePos.y + a / 2, basePos.z + a / 2}}); // Face center
+      }
+    }
+  }
+
+  // Establish neighbor connections (each atom has 12 nearest neighbors in FCC)
+  for (size_t i = 0; i < points.size(); i++) {
+    points[i].neigh.clear();
+
+    for (size_t j = 0; j < points.size(); j++) {
+      if (i == j)
+        continue;
+
+      float dist = Vector3Distance(points[i].pos, points[j].pos);
+      if (dist <=
+          a * 0.71f) { // nearest neighbor distance in FCC is a/sqrt(2) ≈ 0.707a
+        points[i].neigh.push_back(static_cast<int>(j));
+      }
+    }
+  }
+
+  return points;
+}
+
+vector<Atome> make_bcc_struc(int x, int y, int z, float distance) {
+  vector<Atome> points;
+  points.reserve(2 * x * y * z); // BCC has 2 atoms per unit cell
+
+  float a = distance; // lattice constant
+
+  for (int i = 0; i < x; i++) {
+    for (int j = 0; j < y; j++) {
+      for (int k = 0; k < z; k++) {
+        // Base positions for BCC unit cell
+        Vector3 basePos = {i * a, j * a, k * a};
+
+        // Add the 2 atoms of the BCC unit cell
+        points.push_back({basePos}); // Corner (0,0,0)
+        points.push_back({{basePos.x + a / 2, basePos.y + a / 2,
+                           basePos.z + a / 2}}); // Body center
+      }
+    }
+  }
+
+  // Establish neighbor connections (each atom has 8 nearest neighbors in BCC)
+  for (size_t i = 0; i < points.size(); i++) {
+    points[i].neigh.clear();
+
+    for (size_t j = 0; j < points.size(); j++) {
+      if (i == j)
+        continue;
+
+      float dist = Vector3Distance(points[i].pos, points[j].pos);
+      if (dist <= a * 0.87f) { // nearest neighbor distance in BCC is
+                               // a*sqrt(3)/2 ≈ 0.866a
         points[i].neigh.push_back(static_cast<int>(j));
       }
     }
@@ -340,7 +424,8 @@ int main() {
   float cameraSensitivity = 0.3f;
 
   StructureType currentStructure = StructureType ::CUBIC;
-  const char *structureTypes[] = {"Cubic", "Hexagonal"};
+  const char *structureTypes[] = {"Cubic", "Hexagonal", "Face-Centered Cubic",
+                                  "Body-Centered Cubic"};
   int currentStructureType = 0;
 
   // Initialize structure
@@ -518,10 +603,19 @@ int main() {
 
     // Rebuild if needed
     if (needsRebuild) {
-      if (currentStructure == StructureType::CUBIC) {
+      switch (currentStructure) {
+      case StructureType::CUBIC:
         structure = make_cubic_struc(N, O, P, distance);
-      } else {
+        break;
+      case StructureType::HEXAGONAL:
         structure = make_hexagonal_struc(N, O, P, distance);
+        break;
+      case StructureType::FCC:
+        structure = make_fcc_struc(N, O, P, distance);
+        break;
+      case StructureType::BCC:
+        structure = make_bcc_struc(N, O, P, distance);
+        break;
       }
       sphereTransforms.clear();
       for (const auto &atom : structure) {
