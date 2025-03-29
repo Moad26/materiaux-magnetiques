@@ -48,6 +48,107 @@ vector<Atome> make_struc(int x, int y, int z, float distance) {
   return points;
 }
 
+vector<Mesh> CreateChunkedCylinderLines(const vector<Atome>& structure,
+                                      float radius = 0.05f, int segments = 8,
+                                      int maxCylindersPerChunk = 1000) {
+    vector<Mesh> meshChunks;
+    vector<vector<pair<Vector3, Vector3>>> chunks; // Stores start/end points for each chunk
+
+    // First collect all cylinder pairs
+    vector<pair<Vector3, Vector3>> allCylinders;
+    for (const auto& atom : structure) {
+        for (int neighborIdx : atom.neigh) {
+            if (neighborIdx > &atom - &structure[0]) {
+                allCylinders.emplace_back(atom.pos, structure[neighborIdx].pos);
+            }
+        }
+    }
+
+    // Split into chunks
+    for (size_t i = 0; i < allCylinders.size(); i += maxCylindersPerChunk) {
+        auto start = allCylinders.begin() + i;
+        auto end = (i + maxCylindersPerChunk) < allCylinders.size() 
+                 ? start + maxCylindersPerChunk 
+                 : allCylinders.end();
+        chunks.emplace_back(start, end);
+    }
+
+    // Create a mesh for each chunk
+    for (const auto& chunk : chunks) {
+        const int vertsPerCylinder = segments * 2;
+        const int trisPerCylinder = segments * 2;
+        
+        Mesh mesh = {0};
+        mesh.vertexCount = chunk.size() * vertsPerCylinder;
+        mesh.triangleCount = chunk.size() * trisPerCylinder;
+
+        mesh.vertices = (float*)RL_MALLOC(mesh.vertexCount * 3 * sizeof(float));
+        mesh.normals = (float*)RL_MALLOC(mesh.vertexCount * 3 * sizeof(float));
+        mesh.texcoords = (float*)RL_MALLOC(mesh.vertexCount * 2 * sizeof(float));
+        mesh.indices = (unsigned short*)RL_MALLOC(mesh.triangleCount * 3 * sizeof(unsigned short));
+
+        int vertexOffset = 0;
+        int indexOffset = 0;
+
+        for (const auto& [start, end] : chunk) {
+            Vector3 direction = Vector3Normalize(Vector3Subtract(end, start));
+            Vector3 perp = (fabs(direction.x) < fabs(direction.y))
+                ? Vector3Normalize(Vector3CrossProduct(direction, {1, 0, 0}))
+                : Vector3Normalize(Vector3CrossProduct(direction, {0, 1, 0}));
+
+            // Generate cylinder vertices
+            for (int i = 0; i < segments; i++) {
+                float angle = 2 * PI * i / segments;
+                Vector3 circleVec = Vector3Scale(
+                    Vector3Add(Vector3Scale(perp, cosf(angle)),
+                             Vector3Scale(Vector3CrossProduct(perp, direction), sinf(angle))),
+                    radius);
+
+                // Bottom ring
+                mesh.vertices[(vertexOffset + i) * 3 + 0] = start.x + circleVec.x;
+                mesh.vertices[(vertexOffset + i) * 3 + 1] = start.y + circleVec.y;
+                mesh.vertices[(vertexOffset + i) * 3 + 2] = start.z + circleVec.z;
+
+                // Top ring
+                mesh.vertices[(vertexOffset + segments + i) * 3 + 0] = end.x + circleVec.x;
+                mesh.vertices[(vertexOffset + segments + i) * 3 + 1] = end.y + circleVec.y;
+                mesh.vertices[(vertexOffset + segments + i) * 3 + 2] = end.z + circleVec.z;
+
+                // Normals
+                Vector3 normal = Vector3Normalize(circleVec);
+                mesh.normals[(vertexOffset + i) * 3 + 0] = normal.x;
+                mesh.normals[(vertexOffset + i) * 3 + 1] = normal.y;
+                mesh.normals[(vertexOffset + i) * 3 + 2] = normal.z;
+                mesh.normals[(vertexOffset + segments + i) * 3 + 0] = normal.x;
+                mesh.normals[(vertexOffset + segments + i) * 3 + 1] = normal.y;
+                mesh.normals[(vertexOffset + segments + i) * 3 + 2] = normal.z;
+            }
+
+            // Generate cylinder indices
+            for (int i = 0; i < segments; i++) {
+                int next = (i + 1) % segments;
+
+                // Bottom triangle
+                mesh.indices[indexOffset++] = vertexOffset + i;
+                mesh.indices[indexOffset++] = vertexOffset + next;
+                mesh.indices[indexOffset++] = vertexOffset + segments + i;
+
+                // Top triangle
+                mesh.indices[indexOffset++] = vertexOffset + segments + i;
+                mesh.indices[indexOffset++] = vertexOffset + next;
+                mesh.indices[indexOffset++] = vertexOffset + segments + next;
+            }
+
+            vertexOffset += vertsPerCylinder;
+        }
+
+        UploadMesh(&mesh, false);
+        meshChunks.push_back(mesh);
+    }
+
+    return meshChunks;
+}
+
 Mesh CreateBakedCylinderLines(const vector<Atome> &structure,
                               float radius = 0.05f, int segments = 8) {
   int cylinderCount = 0;
@@ -198,8 +299,8 @@ int main() {
   Material sphereMaterial = LoadMaterialDefault();
   sphereMaterial.maps[MATERIAL_MAP_DIFFUSE].color = sphereColor;
 
-  Mesh bakedLineMesh =
-      CreateBakedCylinderLines(structure, cylinderRadius, segments);
+  vector<Mesh> cylinderMeshes =
+      CreateChunkedCylinderLines(structure, cylinderRadius, segments);
   Material lineMaterial = LoadMaterialDefault();
   lineMaterial.maps[MATERIAL_MAP_DIFFUSE].color = cylinderColor;
 
@@ -215,13 +316,13 @@ int main() {
     ImGuiIO &io = ImGui::GetIO();
 
     Vector2 mouseDelta = {0};
-if (!io.WantCaptureMouse || !ImGui::IsAnyItemActive()){
-    if (IsMouseButtonDown(MOUSE_LEFT_BUTTON)) {
-      mouseDelta = GetMouseDelta();
-      HideCursor();
-    } else {
-      ShowCursor();
-    }
+    if (!io.WantCaptureMouse || !ImGui::IsAnyItemActive()) {
+      if (IsMouseButtonDown(MOUSE_LEFT_BUTTON)) {
+        mouseDelta = GetMouseDelta();
+        HideCursor();
+      } else {
+        ShowCursor();
+      }
     }
     cameraAngle.x -= mouseDelta.y * cameraSensitivity;
     cameraAngle.y -= mouseDelta.x * cameraSensitivity;
@@ -274,7 +375,9 @@ if (!io.WantCaptureMouse || !ImGui::IsAnyItemActive()){
 
     BeginMode3D(camera);
     DrawInstanced(sphereMesh, sphereMaterial, sphereTransforms);
-    DrawMesh(bakedLineMesh, lineMaterial, MatrixIdentity());
+    for (const auto &mesh : cylinderMeshes) {
+      DrawMesh(mesh, lineMaterial, MatrixIdentity());
+    }
     if (showGrid)
       DrawGrid(40, 1);
     EndMode3D();
@@ -349,9 +452,8 @@ if (!io.WantCaptureMouse || !ImGui::IsAnyItemActive()){
       UnloadMesh(sphereMesh);
       sphereMesh = GenMeshSphere(sphereRadius, 16, 16);
 
-      UnloadMesh(bakedLineMesh);
-      bakedLineMesh =
-          CreateBakedCylinderLines(structure, cylinderRadius, segments);
+      cylinderMeshes =
+          CreateChunkedCylinderLines(structure, cylinderRadius, segments);
 
       needsRebuild = false;
     }
@@ -361,8 +463,10 @@ if (!io.WantCaptureMouse || !ImGui::IsAnyItemActive()){
 
   // Cleanup
   rlImGuiShutdown();
+  for (auto &mesh : cylinderMeshes) {
+    UnloadMesh(mesh);
+  }
   UnloadMesh(sphereMesh);
-  UnloadMesh(bakedLineMesh);
   UnloadMaterial(sphereMaterial);
   UnloadMaterial(lineMaterial);
   CloseWindow();
