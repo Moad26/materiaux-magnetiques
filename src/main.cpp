@@ -3,7 +3,6 @@
 #include "raymath.h"
 #include "rlImGui.h"
 #include "rlgl.h"
-#include <chrono>
 #include <vector>
 
 using namespace std;
@@ -515,7 +514,22 @@ void MonteCarloStep(vector<Atome> &structure, float temperature, float J,
 }
 int main() {
   // Window setup
-  InitWindow(1920, 1080, "3D Ising Model Simulation");
+  int monitor = GetCurrentMonitor();
+  int screenWidth = GetMonitorWidth(monitor);
+  int screenHeight = GetMonitorHeight(monitor);
+
+  // Calculate window size (with maximum bounds)
+  int windowWidth = screenWidth * 0.55;
+  int windowHeight = screenHeight * 0.55;
+
+  // Initialize window
+  InitWindow(windowWidth, windowHeight, "3D Ising Model Simulation");
+
+  // Center window
+  SetWindowPosition((screenWidth - windowWidth) / 2,
+                    (screenHeight - windowHeight) / 2);
+
+  // Handle high DPI displays
   SetTargetFPS(60);
   rlImGuiSetup(true);
 
@@ -722,11 +736,11 @@ int main() {
     ImGui::Begin("Controls");
 
     // Structure controls
-    if (ImGui::SliderInt("Grid Size X", &N, 1, 20))
+    if (ImGui::SliderInt("Grid Size X", &N, 1, 10))
       needsRebuild = true;
-    if (ImGui::SliderInt("Grid Size Y", &O, 1, 20))
+    if (ImGui::SliderInt("Grid Size Y", &O, 1, 10))
       needsRebuild = true;
-    if (ImGui::SliderInt("Grid Size Z", &P, 1, 20))
+    if (ImGui::SliderInt("Grid Size Z", &P, 1, 10))
       needsRebuild = true;
     if (ImGui::SliderFloat("Atom Distance", &distance, 1.0f, 5.0f))
       needsRebuild = true;
@@ -739,8 +753,14 @@ int main() {
 
     ImGui::Separator();
     ImGui::Text("Visual Parameters");
-    ImGui::SliderFloat("Sphere Radius", &sphereRadius, 0.1f, 1.0f);
-    ImGui::SliderFloat("Bond Radius", &cylinderRadius, 0.01f, 0.2f);
+    bool sphereSizeChanged = false;
+    if (ImGui::SliderFloat("Sphere Radius", &sphereRadius, 0.1f, 1.0f)) {
+      sphereSizeChanged = true;
+    }
+    bool bondRadiusChanged = false;
+    if (ImGui::SliderFloat("Bond Radius", &cylinderRadius, 0.01f, 0.2f)) {
+      bondRadiusChanged = true;
+    }
     ImGui::Checkbox("Show Grid", &showGrid);
 
     // Ising Model Controls
@@ -780,6 +800,12 @@ int main() {
                         (unsigned char)(downColorArray[2] * 255), 255};
     }
 
+    ImGui::Separator();
+    ImGui::Text("Camera Settings");
+    ImGui::Separator();
+    ImGui::SliderFloat("Movement Speed", &movementSpeed, 1.0f, 30.0f);
+    ImGui::SliderFloat("Camera Sensitivity", &cameraSensitivity, 0.1f, 1.0f);
+
     // Simulation stats
     float totalEnergy = CalculateTotalEnergy(structure);
     int upSpins = 0, downSpins = 0;
@@ -799,6 +825,15 @@ int main() {
     ImGui::End();
     rlImGuiEnd();
 
+    if (sphereSizeChanged) {
+      UnloadMesh(sphereMesh);
+      sphereMesh = GenMeshSphere(sphereRadius, 16, 16);
+      sphereSizeChanged = false;
+    }
+    if (bondRadiusChanged) {
+      cylinderMeshes =
+          CreateChunkedCylinderLines(structure, cylinderRadius, segments);
+    }
     EndDrawing();
   }
 
