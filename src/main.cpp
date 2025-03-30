@@ -513,23 +513,14 @@ void MonteCarloStep(vector<Atome> &structure, float temperature, float J,
   }
 }
 int main() {
-  // Window setup
   int monitor = GetCurrentMonitor();
   int screenWidth = GetMonitorWidth(monitor);
   int screenHeight = GetMonitorHeight(monitor);
 
-  // Calculate window size (with maximum bounds)
-  int windowWidth = screenWidth * 0.55;
-  int windowHeight = screenHeight * 0.55;
+  // Borderless window at monitor size
+  InitWindow(screenWidth, screenHeight, "3D Ising Model Simulation");
+  SetWindowPosition(screenWidth / 2, screenHeight / 2);
 
-  // Initialize window
-  InitWindow(windowWidth, windowHeight, "3D Ising Model Simulation");
-
-  // Center window
-  SetWindowPosition((screenWidth - windowWidth) / 2,
-                    (screenHeight - windowHeight) / 2);
-
-  // Handle high DPI displays
   SetTargetFPS(60);
   rlImGuiSetup(true);
 
