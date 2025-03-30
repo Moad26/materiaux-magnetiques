@@ -29,6 +29,8 @@
 # ImGui generated configs (if modified during runtime)
 imgui.ini
 
+.cache/clangd/index
+
 # Ignore CMake API reply files
 .cmake/api/v1/reply
 

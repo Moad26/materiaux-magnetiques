@@ -3,6 +3,7 @@
 #include "raymath.h"
 #include "rlImGui.h"
 #include "rlgl.h"
+#include <chrono>
 #include <vector>
 
 using namespace std;
@@ -19,6 +20,8 @@ enum class StructureType {
   BCC,
 };
 
+enum class SimulationState { PAUSED, RUNNING, STEP };
+
 struct Atome {
   Vector3 pos;
   Spin spin = Spin::UP;
@@ -26,6 +29,15 @@ struct Atome {
   float energy = 0.0f;
   float radius = 0.5f;
 };
+
+SimulationState simState = SimulationState::PAUSED;
+float temperature = 2.5f;
+float J = 1.0f;
+float B = 0.0f;
+int stepsPerFrame = 100;
+bool showEnergy = false;
+Color upColor = RED;
+Color downColor = BLUE;
 
 vector<Atome> make_cubic_struc(int x, int y, int z, float distance) {
   vector<Atome> points(x * y * z);
@@ -36,6 +48,7 @@ vector<Atome> make_cubic_struc(int x, int y, int z, float distance) {
       for (int k = 0; k < z; k++) {
         int idx = getIndex(i, j, k);
         points[idx].pos = {i * distance, j * distance, k * distance};
+        points[idx].spin = GetRandomValue(0, 1) ? Spin::UP : Spin::DOWN;
 
         if (i > 0)
           points[idx].neigh.push_back(getIndex(i - 1, j, k));
@@ -452,9 +465,57 @@ void DrawInstanced(Mesh mesh, Material material, vector<Matrix> &transforms) {
   rlDisableShader();
 }
 
+float CalculateTotalEnergy(const vector<Atome> &structure) {
+  float totalEnergy = 0.0f;
+  for (const auto &atom : structure) {
+    totalEnergy += atom.energy;
+  }
+  return totalEnergy / 2.0f; // Divide by 2 to avoid double counting
+}
+
+void UpdateEnergies(vector<Atome> &structure, float J, float B) {
+  for (auto &atom : structure) {
+    float interactionEnergy = 0.0f;
+    for (int neighborIdx : atom.neigh) {
+      interactionEnergy += static_cast<int>(structure[neighborIdx].spin);
+    }
+    atom.energy = -J * static_cast<int>(atom.spin) * interactionEnergy -
+                  B * static_cast<int>(atom.spin);
+  }
+}
+
+void MonteCarloStep(vector<Atome> &structure, float temperature, float J,
+                    float B) {
+  int randomIdx = GetRandomValue(0, structure.size() - 1);
+  auto &atom = structure[randomIdx];
+
+  float currentEnergy = 0.0f;
+  for (int neighborIdx : atom.neigh) {
+    currentEnergy += static_cast<int>(structure[neighborIdx].spin);
+  }
+  currentEnergy = -J * static_cast<int>(atom.spin) * currentEnergy -
+                  B * static_cast<int>(atom.spin);
+
+  Spin newSpin = (atom.spin == Spin::UP) ? Spin::DOWN : Spin::UP;
+
+  float newEnergy = 0.0f;
+  for (int neighborIdx : atom.neigh) {
+    newEnergy += static_cast<int>(structure[neighborIdx].spin);
+  }
+  newEnergy = -J * static_cast<int>(newSpin) * newEnergy -
+              B * static_cast<int>(newSpin);
+
+  float deltaE = newEnergy - currentEnergy;
+
+  if (deltaE < 0 || (temperature > 0 && GetRandomValue(0, 10000) / 10000.0f <
+                                            exp(-deltaE / temperature))) {
+    atom.spin = newSpin;
+    UpdateEnergies(structure, J, B);
+  }
+}
 int main() {
   // Window setup
-  InitWindow(1920, 1080, "Atom Structure Visualization");
+  InitWindow(1920, 1080, "3D Ising Model Simulation");
   SetTargetFPS(60);
   rlImGuiSetup(true);
 
@@ -467,45 +528,38 @@ int main() {
   camera.projection = CAMERA_PERSPECTIVE;
 
   // Simulation parameters
-  int N = 10;
-  int O = 10;
-  int P = 10;
+  int N = 10, O = 10, P = 10;
   float distance = 2.0f;
   float sphereRadius = 0.5f;
   float cylinderRadius = 0.05f;
   int segments = 8;
-  Color sphereColor = RED;
-  Color cylinderColor = BLACK;
   bool showGrid = true;
-  bool needsRebuild = false;
-
-  // Camera control parameters
+  bool needsRebuild = true;
   Vector2 cameraAngle = {0};
-  float movementSpeed = 10.0f; // Units per second
+  float movementSpeed = 10.0f;
   float cameraSensitivity = 0.3f;
 
-  StructureType currentStructure = StructureType ::CUBIC;
+  // Structure type
+  StructureType currentStructure = StructureType::CUBIC;
   const char *structureTypes[] = {"Cubic", "Hexagonal", "Face-Centered Cubic",
                                   "Body-Centered Cubic"};
   int currentStructureType = 0;
 
   // Initialize structure
-  auto structure = make_cubic_struc(N, O, P, distance);
+  vector<Atome> structure;
   vector<Matrix> sphereTransforms;
-  for (const auto &atom : structure) {
-    sphereTransforms.push_back(
-        MatrixTranslate(atom.pos.x, atom.pos.y, atom.pos.z));
-  }
+  vector<Mesh> cylinderMeshes;
 
-  // Create meshes
+  // Create default sphere mesh and material
   Mesh sphereMesh = GenMeshSphere(sphereRadius, 16, 16);
   Material sphereMaterial = LoadMaterialDefault();
-  sphereMaterial.maps[MATERIAL_MAP_DIFFUSE].color = sphereColor;
+  sphereMaterial.maps[MATERIAL_MAP_DIFFUSE].color = RED;
 
-  vector<Mesh> cylinderMeshes =
+  // Create line material
+  cylinderMeshes =
       CreateChunkedCylinderLines(structure, cylinderRadius, segments);
   Material lineMaterial = LoadMaterialDefault();
-  lineMaterial.maps[MATERIAL_MAP_DIFFUSE].color = cylinderColor;
+  lineMaterial.maps[MATERIAL_MAP_DIFFUSE].color = BLACK;
 
   ImGuiStyle &style = ImGui::GetStyle();
   style.WindowPadding = ImVec2(20, 20);    // Inner window padding
@@ -513,9 +567,9 @@ int main() {
   style.ItemSpacing = ImVec2(15, 15);      // Space between elements
   style.GrabMinSize = 20.0f;               // Slider handle width
   style.WindowMinSize = ImVec2(500, 1000); // Minimum window size
-  // Main loop
-  while (!WindowShouldClose()) {
 
+  // Main game loop
+  while (!WindowShouldClose()) {
     // Get frame timing for consistent movement speed
     float deltaTime = GetFrameTime();
     float currentSpeed = movementSpeed * deltaTime;
@@ -583,86 +637,7 @@ int main() {
     } else {
       ShowCursor();
     }
-
-    // Rendering
-    BeginDrawing();
-    ClearBackground(RAYWHITE);
-
-    BeginMode3D(camera);
-    DrawInstanced(sphereMesh, sphereMaterial, sphereTransforms);
-    for (const auto &mesh : cylinderMeshes) {
-      DrawMesh(mesh, lineMaterial, MatrixIdentity());
-    }
-    if (showGrid)
-      DrawGrid(40, 1);
-    EndMode3D();
-
-    // UI
-    rlImGuiBegin();
-    ImGui::Begin("Controls");
-    ImGui::Text("Structure Parameters");
-    ImGui::Separator();
-
-    bool structureChanged = false;
-    if (ImGui::SliderInt("Grid Size X", &N, 1, 10))
-      structureChanged = true;
-    if (ImGui::SliderInt("Grid Size Y", &O, 1, 10))
-      structureChanged = true;
-    if (ImGui::SliderInt("Grid Size Z", &P, 1, 10))
-      structureChanged = true;
-    if (ImGui::SliderFloat("Atom Distance", &distance, 1.0f, 5.0f))
-      structureChanged = true;
-    ImGui::Combo("Structure Type", &currentStructureType, structureTypes,
-                 IM_ARRAYSIZE(structureTypes));
-    currentStructure = static_cast<StructureType>(currentStructureType);
-    ImGui::Separator();
-    ImGui::Text("Visual Parameters");
-    ImGui::Separator();
-
-    ImGui::SliderFloat("Sphere Radius", &sphereRadius, 0.1f, 1.0f);
-    ImGui::SliderFloat("Bond Radius", &cylinderRadius, 0.01f, 0.2f);
-    ImGui::SliderInt("Bond Segments", &segments, 3, 16);
-
-    float sphereColorArray[3] = {sphereColor.r / 255.0f, sphereColor.g / 255.0f,
-                                 sphereColor.b / 255.0f};
-    if (ImGui::ColorEdit3("Sphere Color", sphereColorArray)) {
-      sphereColor = (Color){(unsigned char)(sphereColorArray[0] * 255),
-                            (unsigned char)(sphereColorArray[1] * 255),
-                            (unsigned char)(sphereColorArray[2] * 255), 255};
-      sphereMaterial.maps[MATERIAL_MAP_DIFFUSE].color = sphereColor;
-    }
-
-    float cylinderColorArray[3] = {cylinderColor.r / 255.0f,
-                                   cylinderColor.g / 255.0f,
-                                   cylinderColor.b / 255.0f};
-    if (ImGui::ColorEdit3("Bond Color", cylinderColorArray)) {
-      cylinderColor =
-          (Color){(unsigned char)(cylinderColorArray[0] * 255),
-                  (unsigned char)(cylinderColorArray[1] * 255),
-                  (unsigned char)(cylinderColorArray[2] * 255), 255};
-      lineMaterial.maps[MATERIAL_MAP_DIFFUSE].color = cylinderColor;
-    }
-
-    ImGui::Checkbox("Show Grid", &showGrid);
-
-    ImGui::Separator();
-    ImGui::Text("Camera Settings");
-    ImGui::Separator();
-    ImGui::SliderFloat("Movement Speed", &movementSpeed, 1.0f, 30.0f);
-    ImGui::SliderFloat("Camera Sensitivity", &cameraSensitivity, 0.1f, 1.0f);
-
-    if (ImGui::Button("Rebuild Structure") || structureChanged) {
-      needsRebuild = true;
-    }
-
-    ImGui::Separator();
-    ImGui::Text("Camera Pos: (%.1f, %.1f, %.1f)", camera.position.x,
-                camera.position.y, camera.position.z);
-    ImGui::Text("FPS: %d", GetFPS());
-    ImGui::End();
-    rlImGuiEnd();
-
-    // Rebuild if needed
+    // Rebuild structure if needed
     if (needsRebuild) {
       switch (currentStructure) {
       case StructureType::CUBIC:
@@ -678,28 +653,161 @@ int main() {
         structure = make_bcc_struc(N, O, P, distance);
         break;
       }
+
+      // Initialize spins and energies
+      for (auto &atom : structure) {
+        atom.spin = GetRandomValue(0, 1) ? Spin::UP : Spin::DOWN;
+      }
+      UpdateEnergies(structure, J, B);
+
+      // Recreate transforms
       sphereTransforms.clear();
       for (const auto &atom : structure) {
         sphereTransforms.push_back(
             MatrixTranslate(atom.pos.x, atom.pos.y, atom.pos.z));
       }
-      UnloadMesh(sphereMesh);
-      sphereMesh = GenMeshSphere(sphereRadius, 16, 16);
 
+      // Recreate cylinder meshes
       cylinderMeshes =
           CreateChunkedCylinderLines(structure, cylinderRadius, segments);
 
       needsRebuild = false;
     }
+
+    // Run simulation
+    if (simState == SimulationState::RUNNING ||
+        simState == SimulationState::STEP) {
+      for (int i = 0; i < stepsPerFrame; i++) {
+        MonteCarloStep(structure, temperature, J, B);
+      }
+
+      if (simState == SimulationState::STEP) {
+        simState = SimulationState::PAUSED;
+      }
+    }
+
+    // Rendering
+    BeginDrawing();
+    ClearBackground(RAYWHITE);
+
+    BeginMode3D(camera);
+    // Draw spheres
+    for (size_t i = 0; i < structure.size(); i++) {
+      Color color = (structure[i].spin == Spin::UP) ? upColor : downColor;
+      if (showEnergy) {
+        // Calculate normalized energy (0-1 range)
+        float minE = -fabsf(J) * structure[i].neigh.size() - fabsf(B);
+        float maxE = fabsf(J) * structure[i].neigh.size() + fabsf(B);
+        float normalizedEnergy = (structure[i].energy - minE) / (maxE - minE);
+        normalizedEnergy = Clamp(normalizedEnergy, 0.0f, 1.0f);
+
+        color = Color{(unsigned char)(255 * normalizedEnergy), 0,
+                      (unsigned char)(255 * (1.0f - normalizedEnergy)), 255};
+      }
+      sphereMaterial.maps[MATERIAL_MAP_DIFFUSE].color = color;
+      DrawMesh(sphereMesh, sphereMaterial, sphereTransforms[i]);
+    }
+
+    // Draw cylinders
+    for (const auto &mesh : cylinderMeshes) {
+      DrawMesh(mesh, lineMaterial, MatrixIdentity());
+    }
+
+    if (showGrid)
+      DrawGrid(40, 1);
+    EndMode3D();
+
+    // UI
+    rlImGuiBegin();
+    ImGui::Begin("Controls");
+
+    // Structure controls
+    if (ImGui::SliderInt("Grid Size X", &N, 1, 20))
+      needsRebuild = true;
+    if (ImGui::SliderInt("Grid Size Y", &O, 1, 20))
+      needsRebuild = true;
+    if (ImGui::SliderInt("Grid Size Z", &P, 1, 20))
+      needsRebuild = true;
+    if (ImGui::SliderFloat("Atom Distance", &distance, 1.0f, 5.0f))
+      needsRebuild = true;
+
+    if (ImGui::Combo("Structure Type", &currentStructureType, structureTypes,
+                     IM_ARRAYSIZE(structureTypes))) {
+      currentStructure = static_cast<StructureType>(currentStructureType);
+      needsRebuild = true;
+    }
+
+    ImGui::Separator();
+    ImGui::Text("Visual Parameters");
+    ImGui::SliderFloat("Sphere Radius", &sphereRadius, 0.1f, 1.0f);
+    ImGui::SliderFloat("Bond Radius", &cylinderRadius, 0.01f, 0.2f);
+    ImGui::Checkbox("Show Grid", &showGrid);
+
+    // Ising Model Controls
+    ImGui::Separator();
+    ImGui::Text("Ising Model Simulation");
+    ImGui::Separator();
+
+    if (ImGui::Button("Start Simulation"))
+      simState = SimulationState::RUNNING;
+    ImGui::SameLine();
+    if (ImGui::Button("Pause Simulation"))
+      simState = SimulationState::PAUSED;
+    ImGui::SameLine();
+    if (ImGui::Button("Single Step"))
+      simState = SimulationState::STEP;
+
+    ImGui::SliderFloat("Temperature", &temperature, 0.0f, 5.0f);
+    ImGui::SliderFloat("Coupling (J)", &J, -2.0f, 2.0f);
+    ImGui::SliderFloat("Magnetic Field (B)", &B, -2.0f, 2.0f);
+    ImGui::SliderInt("Steps/Frame", &stepsPerFrame, 1, 1000);
+    ImGui::Checkbox("Show Energy", &showEnergy);
+
+    // Color controls
+    float upColorArray[3] = {upColor.r / 255.0f, upColor.g / 255.0f,
+                             upColor.b / 255.0f};
+    if (ImGui::ColorEdit3("Up Spin Color", upColorArray)) {
+      upColor = Color{(unsigned char)(upColorArray[0] * 255),
+                      (unsigned char)(upColorArray[1] * 255),
+                      (unsigned char)(upColorArray[2] * 255), 255};
+    }
+
+    float downColorArray[3] = {downColor.r / 255.0f, downColor.g / 255.0f,
+                               downColor.b / 255.0f};
+    if (ImGui::ColorEdit3("Down Spin Color", downColorArray)) {
+      downColor = Color{(unsigned char)(downColorArray[0] * 255),
+                        (unsigned char)(downColorArray[1] * 255),
+                        (unsigned char)(downColorArray[2] * 255), 255};
+    }
+
+    // Simulation stats
+    float totalEnergy = CalculateTotalEnergy(structure);
+    int upSpins = 0, downSpins = 0;
+    for (const auto &atom : structure) {
+      if (atom.spin == Spin::UP)
+        upSpins++;
+      else
+        downSpins++;
+    }
+
+    ImGui::Text("Total Energy: %.2f", totalEnergy);
+    ImGui::Text("Up Spins: %d, Down Spins: %d", upSpins, downSpins);
+    ImGui::Text("Magnetization: %.2f",
+                (upSpins - downSpins) / (float)structure.size());
+    ImGui::Text("FPS: %d", GetFPS());
+
+    ImGui::End();
+    rlImGuiEnd();
+
     EndDrawing();
   }
 
   // Cleanup
   rlImGuiShutdown();
+  UnloadMesh(sphereMesh);
   for (auto &mesh : cylinderMeshes) {
     UnloadMesh(mesh);
   }
-  UnloadMesh(sphereMesh);
   UnloadMaterial(sphereMaterial);
   UnloadMaterial(lineMaterial);
   CloseWindow();
