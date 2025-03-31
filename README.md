@@ -257,16 +257,7 @@ $$E_i = -J \cdot s_i \cdot \sum_{j \in \text{neighbors}} s_j - B \cdot s_i$$
 
 ### Monte Carlo Simulation
 
-- Random spin flip, accepted if $\Delta E < 0 $ or $e^{-\Delta E / T} > \text{random}(0,1)$.
-
-## Future Improvements
-
-- **Security**: Use SHA-256 with salts for passwords.
-- **Instancing**: Optimize `DrawInstanced`.
-- **Font Path**: Make configurable.
-- **Accuracy**: Improve neighbor detection.
-- **Features**: Add save/load functionality.
-- **Portability**: Support Windows/macOS.
+- Random spin flip, accepted if $\Delta E < 0$ or $e^{-\Delta E / T} > \text{random}(0,1)$.
 
 ## License
 
