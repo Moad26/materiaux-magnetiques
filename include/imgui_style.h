@@ -7,7 +7,6 @@ inline void SetCustomImGuiStyle(float scaling = 1.5f) {
   ImGuiStyle &style = ImGui::GetStyle();
   ImGuiIO &io = ImGui::GetIO();
 
-  // Clear existing fonts
   io.Fonts->Clear();
 
   // Configure font settings for better rendering
@@ -21,7 +20,6 @@ inline void SetCustomImGuiStyle(float scaling = 1.5f) {
                                "JetBrainsMonoNLNerdFont-Regular.ttf",
                                18.0f * scaling, // Scale the base font size
                                &fontConfig);
-
   // Basic scaling (don't use FontGlobalScale when scaling the font directly)
   style.ScaleAllSizes(scaling);
   // io.FontGlobalScale = 1.0f; // Uncomment if you prefer using FontGlobalScale
