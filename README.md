@@ -235,7 +235,9 @@ Adjust flags for your platform (Linux assumed).
 ### Ising Model Implementation
 
 Energy per atom:
-$$E_i = -J \cdot s_i \cdot \sum_{j \in \text{neighbors}} s_j - B \cdot s_i$$
+$$
+E_i = -J \cdot s_i \cdot \sum_{j \in \text{neighbors}} s_j - B \cdot s_i
+$$
 
 - $s_i = \pm 1$: the spin of atom $i$
 - $J$: the coupling constant between neighboring spins
