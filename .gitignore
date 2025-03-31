@@ -25,11 +25,16 @@
 *.lo
 *.la
 *.dylib
+*.pdb  # Debug symbols
+*.ilk  # Incremental linking files
 
 # ImGui generated configs (if modified during runtime)
 imgui.ini
 
 .cache/clangd/index
+.ccls-cache/
+.clangd
+.ccls
 
 # Ignore CMake API reply files
 .cmake/api/v1/reply
@@ -48,3 +53,12 @@ imgui.ini
 
 # Compilation database (if generated)
 compile_commands.json
+
+# IDE-specific files
+.vscode/
+.idea/
+*.sln
+*.vcxproj*
+*.ncb
+*.suo
+*.user
