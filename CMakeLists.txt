@@ -6,61 +6,46 @@ project(crist-project)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
 
-# Define platform-specific settings
-if(WIN32)
-  set(PLATFORM_LIBS winmm gdi32)
-else()
-  set(PLATFORM_LIBS GL m pthread dl rt X11)
-endif()
-
 # Include directories
-include_directories(include ${CMAKE_CURRENT_SOURCE_DIR}/imgui
-                    ${CMAKE_CURRENT_SOURCE_DIR}/rlImGui)
-
-# Add Raylib include path based on platform
-if(WIN32)
-  include_directories(${CMAKE_SOURCE_DIR}/raylib/include)
-  link_directories(${CMAKE_SOURCE_DIR}/raylib/lib)
-else()
-  find_package(PkgConfig REQUIRED)
-  pkg_check_modules(RAYLIB REQUIRED raylib)
-  include_directories(${RAYLIB_INCLUDE_DIRS})
-endif()
+include_directories(
+  include /usr/local/include ${CMAKE_CURRENT_SOURCE_DIR}/imgui
+  ${CMAKE_CURRENT_SOURCE_DIR}/rlImGui)
 
 # Define the source files
 file(GLOB_RECURSE PROJECT_SOURCES "src/*.cpp")
+
+# ImGui source files
 set(IMGUI_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/imgui/imgui.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/imgui/imgui_demo.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/imgui/imgui_draw.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/imgui/imgui_tables.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/imgui/imgui_widgets.cpp)
+
+# rlImGui source files
 set(RLIMGUI_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/rlImGui/rlImGui.cpp)
+
+# Combine all sources
 set(SOURCES ${PROJECT_SOURCES} ${IMGUI_SOURCES} ${RLIMGUI_SOURCES})
 
 # Add the executable
 add_executable(crist-project ${SOURCES})
 
-# Add Windows-specific post-build command *after* the target is defined
-if(WIN32)
-  add_custom_command(
-    TARGET ${PROJECT_NAME}
-    POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_SOURCE_DIR}/assets
-            $<TARGET_FILE_DIR:${PROJECT_NAME}>/assets)
-endif()
+# Optional: Use pkg-config for automatic Raylib detection
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(RAYLIB REQUIRED raylib)
+include_directories(${RAYLIB_INCLUDE_DIRS})
 
-# Link libraries based on platform
-if(WIN32)
-  target_link_libraries(crist-project raylib ${PLATFORM_LIBS})
-else()
-  target_link_libraries(crist-project ${RAYLIB_LIBRARIES} ${PLATFORM_LIBS})
-endif()
+# Link libraries
+target_link_libraries(
+  crist-project
+  ${RAYLIB_LIBRARIES}
+  GL
+  m
+  pthread
+  dl
+  rt
+  X11)
 
 # Set the output directory for the executable
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
-
-# Add Windows-specific executable properties
-if(WIN32)
-  set_target_properties(crist-project PROPERTIES SUFFIX ".exe")
-endif()

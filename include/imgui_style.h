@@ -16,33 +16,11 @@ inline void SetCustomImGuiStyle(float scaling = 1.5f) {
   fontConfig.OversampleV = 2;   // Vertical oversampling
   fontConfig.PixelSnapH = true; // Snap to pixel boundaries
 
-  // Define font path based on platform
-#ifdef _WIN32
-  const char *fontPath =
-      "assets\\JetBrainsMonoNLNerdFont-Regular.ttf"; // Windows path with
-                                                     // backslashes
-#elif defined(__linux__)
-  const char *fontPath =
-      "assets/JetBrainsMonoNLNerdFont-Regular.ttf"; // Linux path with forward
-                                                    // slashes
-#else
-  const char *fontPath =
-      "assets/JetBrainsMonoNLNerdFont-Regular.ttf"; // Default (assume forward
-                                                    // slashes)
-#endif
-
-  printf("Platform-detected font path: %s\n", fontPath);
-  ImFont *font =
-      io.Fonts->AddFontFromFileTTF(fontPath, 18.0f * scaling, &fontConfig);
-  if (font == nullptr) {
-    printf(
-        "Error: Could not load font from %s. Falling back to default font.\n",
-        fontPath);
-    io.Fonts->AddFontDefault();
-  } else {
-    printf("Successfully loaded font from %s\n", fontPath);
-  }
-
+  // Load font with improved settings
+  io.Fonts->AddFontFromFileTTF("/home/moad/desktop/cpp/crist-project/assets/"
+                               "JetBrainsMonoNLNerdFont-Regular.ttf",
+                               18.0f * scaling, // Scale the base font size
+                               &fontConfig);
   // Basic scaling (don't use FontGlobalScale when scaling the font directly)
   style.ScaleAllSizes(scaling);
   // io.FontGlobalScale = 1.0f; // Uncomment if you prefer using FontGlobalScale
