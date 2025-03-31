@@ -1,13 +1,21 @@
 #include "simulation.h"
 
+// Variables globales (conservées car partagées avec l'UI)
 SimulationState simState = SimulationState::PAUSED;
 float temperature = 2.5f;
 float J = 1.0f;
 float B = 0.0f;
 int stepsPerFrame = 100;
 bool showEnergy = false;
-Color upColor = RED;
-Color downColor = BLUE;
+Color upColor = RED;    // Couleur spin up
+Color downColor = BLUE; // Couleur spin down
+
+/**
+ * @brief Crée un réseau cubique simple
+ * @param x,y,z Dimensions du réseau
+ * @param distance Distance interatomique
+ * @return Vecteur des atomes positionnés
+ */
 
 vector<Atome> make_cubic_struc(int x, int y, int z, float distance) {
   vector<Atome> points(x * y * z);
@@ -435,6 +443,11 @@ void DrawInstanced(Mesh mesh, Material material, vector<Matrix> &transforms) {
   rlDisableShader();
 }
 
+/**
+ * @brief Calcule l'énergie totale du système
+ * @param structure Vecteur des atomes
+ * @return Énergie totale (divisée par 2 pour éviter double comptage)
+ */
 float CalculateTotalEnergy(const vector<Atome> &structure) {
   float totalEnergy = 0.0f;
   for (const auto &atom : structure) {
@@ -443,6 +456,11 @@ float CalculateTotalEnergy(const vector<Atome> &structure) {
   return totalEnergy / 2.0f; // Divide by 2 to avoid double counting
 }
 
+/**
+ * @brief Met à jour les énergies de tous les atomes
+ * @param structure Vecteur des atomes
+ * @param params Paramètres de simulation
+ */
 void UpdateEnergies(vector<Atome> &structure, float J, float B) {
   for (auto &atom : structure) {
     float interactionEnergy = 0.0f;
@@ -454,6 +472,13 @@ void UpdateEnergies(vector<Atome> &structure, float J, float B) {
   }
 }
 
+// Simulation MONTE CARLO //
+
+/**
+ * @brief Effectue un pas Monte Carlo
+ * @param structure Référence vers les atomes
+ * @param params Paramètres de simulation (température, champ B, etc.)
+ */
 void MonteCarloStep(vector<Atome> &structure, float temperature, float J,
                     float B) {
   int randomIdx = GetRandomValue(0, structure.size() - 1);

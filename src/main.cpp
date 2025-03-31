@@ -4,24 +4,24 @@
 #include "simulation_ui.h"
 
 int main() {
-  // Initialize window
+  // Initialisation fenêtre en plein écran
   int monitor = GetCurrentMonitor();
   int screenWidth = GetMonitorWidth(monitor);
   int screenHeight = GetMonitorHeight(monitor);
 
-  // Borderless window at monitor size
+  // Création fenêtre borderless
   InitWindow(screenWidth, screenHeight, "3D Ising Model Simulation");
   SetWindowPosition(screenWidth / 2, screenHeight / 2);
   SetTargetFPS(60);
   rlImGuiSetup(true);
 
-  // User data
+  // Authentification utilisateur
   bool logged_in = runAuthentication();
-  // Clean up ImGui and close window before starting simulation
+  // Nettoyage après authentification
   rlImGuiShutdown();
   CloseWindow();
 
-  // Run simulation only if logged in
+  // Si authentification réussie, lancer la simulation avec les paramètres
   if (logged_in) {
     runSimulation();
   }

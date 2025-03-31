@@ -11,19 +11,29 @@
 using namespace std;
 
 enum class Spin : int {
-  UP = 1,
-  DOWN = -1,
+  UP = 1,    // Spin orienté vers le haut
+  DOWN = -1, // Spin orienté vers le bas
 };
 
+/// Type de structure cristalline supportée
 enum class StructureType {
-  CUBIC,
-  HEXAGONAL,
-  FCC,
-  BCC,
+  CUBIC,     // Cubique simple
+  HEXAGONAL, // Hexagonal compact (HCP)
+  FCC,       // Cubique à faces centrées
+  BCC,       // Cubique centré
 };
 
-enum class SimulationState { PAUSED, RUNNING, STEP };
+// ÉNUMÉRATIONS ET STRUCTURES DE DONNÉES
 
+/// État possible de la simulation
+
+enum class SimulationState {
+  PAUSED,  // Simulation en cours
+  RUNNING, // Simulation en pause
+  STEP     // Un seul pas de simulation
+};
+
+/// Représente un atome dans le réseau
 struct Atome {
   Vector3 pos;
   Spin spin = Spin::UP;
@@ -42,24 +52,93 @@ extern bool showEnergy;
 extern Color upColor;
 extern Color downColor;
 
-// Structure generation functions
+// FONCTIONS DE CONSTRUCTION DES RÉSEAUX
 vector<Atome> make_cubic_struc(int x, int y, int z, float distance);
-vector<Atome> make_hexagonal_struc(int x, int y, int z, float distance);
-vector<Atome> make_fcc_struc(int x, int y, int z, float distance);
-vector<Atome> make_bcc_struc(int x, int y, int z, float distance);
+/**
+ * Crée un réseau cubique simple
+ * @param x,y,z Dimensions du réseau en nombre d'atomes
+ * @param distance Distance interatomique
+ * @return Vecteur contenant tous les atomes positionnés
+ */
 
-// Visualization functions
+vector<Atome> make_hexagonal_struc(int x, int y, int z, float distance);
+/**
+ * Crée un réseau hexagonal compact (HCP)
+ * @param x,y,z Dimensions du réseau
+ * @param distance Distance entre atomes voisins
+ * @return Vecteur des atomes avec empilement ABAB
+ */
+
+vector<Atome> make_fcc_struc(int x, int y, int z, float distance);
+/**
+ * Crée un réseau cubique à faces centrées (FCC)
+ * @param x,y,z Dimensions du réseau
+ * @param distance Paramètre de maille
+ * @return Vecteur des atomes avec leurs 12 voisins
+ */
+
+vector<Atome> make_bcc_struc(int x, int y, int z, float distance);
+/**
+ * Crée un réseau cubique centré (BCC)
+ * @param x,y,z Dimensions du réseau
+ * @param distance Paramètre de maille
+ * @return Vecteur des atomes avec leurs 8 voisins
+ */
+
+// FONCTIONS DE VISUALISATION
 vector<Mesh> CreateChunkedCylinderLines(const vector<Atome> &structure,
                                         float radius = 0.05f, int segments = 8,
                                         int maxCylindersPerChunk = 1000);
+/**
+ * Crée des cylindres pour les liaisons entre atomes
+ * (version optimisée par la methode de chunked baking)
+ * @param structure Vecteur d'atomes
+ * @param radius Rayon des cylindres
+ * @param segments Nombre de segments par cylindre
+ * @param maxCylindersPerChunk Nombre max de cylindres par mesh
+ * @return Vecteur de meshs pour le rendu
+ */
+
 Mesh CreateBakedCylinderLines(const vector<Atome> &structure,
                               float radius = 0.05f, int segments = 8);
-void DrawInstanced(Mesh mesh, Material material, vector<Matrix> &transforms);
+/**
+ * Crée des cylindres pour les liaisons
+ * (version optimisée par la methode de baking)
+ * @param structure Vecteur d'atomes
+ * @param radius Rayon des cylindres
+ * @param segments Nombre de segments
+ * @return Mesh unique contenant toutes les liaisons
+ */
 
-// Simulation functions
+void DrawInstanced(Mesh mesh, Material material, vector<Matrix> &transforms);
+/**
+ * Dessine un mesh avec plusieurs transformations (instancing)
+ * @param mesh Mesh à dessiner
+ * @param material Matériau à appliquer
+ * @param transforms Matrices de transformation
+ */
+
+// FONCTIONS DE SIMULATION
 float CalculateTotalEnergy(const vector<Atome> &structure);
+/**
+ * Calcule l'énergie totale du système
+ * @param structure Vecteur d'atomes
+ * @return Énergie totale (divisée par 2 pour éviter double comptage)
+ */
+
 void UpdateEnergies(vector<Atome> &structure, float J, float B);
+/**
+ * Met à jour les énergies de tous les atomes
+ * @param structure Vecteur d'atomes à mettre à jour
+ * @param params Paramètres courants (B, J implicite)
+ */
+
 void MonteCarloStep(vector<Atome> &structure, float temperature, float J,
                     float B);
+/**
+ * Effectue un pas Monte Carlo (algorithme de Metropolis)
+ * @param structure Référence au vecteur d'atomes
+ * @param params Paramètres de simulation actuels
+ */
 
 #endif // SIMULATION_H

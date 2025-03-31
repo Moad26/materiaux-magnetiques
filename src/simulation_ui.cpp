@@ -2,18 +2,18 @@
 #include "imgui_style.h"
 
 int runSimulation() {
+  // Configuration de la fenêtre
   int monitor = GetCurrentMonitor();
   int screenWidth = GetMonitorWidth(monitor);
   int screenHeight = GetMonitorHeight(monitor);
 
-  // Borderless window at monitor size
   InitWindow(screenWidth, screenHeight, "3D Ising Model Simulation");
   SetWindowPosition(screenWidth / 2, screenHeight / 2);
 
   SetTargetFPS(60);
   rlImGuiSetup(true);
 
-  // Camera setup
+  // Configuration de la caméra
   Camera3D camera = {0};
   camera.position = {0, 10, 30};
   camera.target = {10, 10, 10};
@@ -21,7 +21,7 @@ int runSimulation() {
   camera.fovy = 60.0f;
   camera.projection = CAMERA_PERSPECTIVE;
 
-  // Simulation parameters
+  // Paramètres du système
   int N = 10, O = 10, P = 10;
   float distance = 2.0f;
   float sphereRadius = 0.5f;
@@ -39,7 +39,7 @@ int runSimulation() {
                                   "Body-Centered Cubic"};
   int currentStructureType = 0;
 
-  // Initialize structure
+  // Initialisation des structures
   vector<Atome> structure;
   vector<Matrix> sphereTransforms;
   vector<Mesh> cylinderMeshes;
