@@ -1,6 +1,3 @@
-Here’s the updated documentation formatted explicitly as Markdown for your `README.md` file. I've ensured proper Markdown syntax, including headers, code blocks, lists, and inline formatting, based on the latest project structure and details you provided.
-
-```markdown
 # Crist-Project: 3D Ising Model Simulation
 
 The `crist-project` is a sophisticated 3D visualization and simulation tool for the Ising model, a fundamental concept in statistical mechanics used to study magnetic phase transitions. This application combines an interactive graphical interface powered by Raylib and ImGui, a basic authentication system, and support for multiple lattice structures (cubic, hexagonal, FCC, BCC). Users can manipulate simulation parameters, visualize atomic spins in real-time, and explore the system's evolution using Monte Carlo methods.
@@ -54,8 +51,6 @@ Ensure Raylib is installed system-wide or linked appropriately in your build env
 
 ## Project Structure
 
-```
-
 crist-project/
 ├── CMakeLists.txt          # CMake configuration file
 ├── README.md               # Project documentation
@@ -99,8 +94,6 @@ crist-project/
     ├── simulation.cpp
     ├── simulation_ui.cpp
     └── users.txt           # Optional initial user file
-
-```
 
 ## File Descriptions
 
@@ -175,6 +168,7 @@ crist-project/
 ### Using CMake
 
 1. **Clone the Repository**:
+
    ```bash
    git clone <repository-url>
    cd crist-project
