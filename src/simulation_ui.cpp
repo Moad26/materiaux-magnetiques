@@ -189,8 +189,28 @@ int runSimulation() {
         float normalizedEnergy = (structure[i].energy - minE) / (maxE - minE);
         normalizedEnergy = Clamp(normalizedEnergy, 0.0f, 1.0f);
 
-        color = Color{(unsigned char)(255 * normalizedEnergy), 0,
-                      (unsigned char)(255 * (1.0f - normalizedEnergy)), 255};
+        if (normalizedEnergy < 0.25f) {
+          float t = normalizedEnergy / 0.25f;
+          color.r = (unsigned char)(72 * t + 68 * (1 - t));
+          color.g = (unsigned char)(33 * t + 1 * (1 - t));
+          color.b = (unsigned char)(116 * t + 84 * (1 - t));
+        } else if (normalizedEnergy < 0.5f) {
+          float t = (normalizedEnergy - 0.25f) / 0.25f;
+          color.r = (unsigned char)(32 * t + 72 * (1 - t));
+          color.g = (unsigned char)(144 * t + 33 * (1 - t));
+          color.b = (unsigned char)(140 * t + 116 * (1 - t));
+        } else if (normalizedEnergy < 0.75f) {
+          float t = (normalizedEnergy - 0.5f) / 0.25f;
+          color.r = (unsigned char)(253 * t + 32 * (1 - t));
+          color.g = (unsigned char)(231 * t + 144 * (1 - t));
+          color.b = (unsigned char)(37 * t + 140 * (1 - t));
+        } else {
+          float t = (normalizedEnergy - 0.75f) / 0.25f;
+          color.r = (unsigned char)(253 * t + 253 * (1 - t));
+          color.g = (unsigned char)(231 * t + 231 * (1 - t));
+          color.b = (unsigned char)(37 * t + 37 * (1 - t));
+        }
+        color.a = 255;
       }
       sphereMaterial.maps[MATERIAL_MAP_DIFFUSE].color = color;
       DrawMesh(sphereMesh, sphereMaterial, sphereTransforms[i]);
