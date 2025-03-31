@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Download and set up raylib for Windows cross-compilation
-RAYLIB_VERSION="4.0.0"  # Changed from 4.5.0 to 4.0.0
+RAYLIB_VERSION="4.5.0"  # Changed from 4.5.0 to 4.0.0
 RAYLIB_URL="https://github.com/raysan5/raylib/releases/download/${RAYLIB_VERSION}/raylib-${RAYLIB_VERSION}_win64_mingw-w64.zip"
 
 echo "Downloading raylib ${RAYLIB_VERSION} for Windows..."

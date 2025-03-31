@@ -1,0 +1,3 @@
+/usr/bin/cmake -E rm -f CMakeFiles/crist-project.dir/objects.a
+/usr/bin/x86_64-w64-mingw32-ar qc CMakeFiles/crist-project.dir/objects.a @CMakeFiles/crist-project.dir/objects1.rsp
+/usr/bin/x86_64-w64-mingw32-g++ -Wl,--whole-archive CMakeFiles/crist-project.dir/objects.a -Wl,--no-whole-archive -o crist-project.exe -Wl,--out-implib,libcrist-project.dll.a -Wl,--major-image-version,0,--minor-image-version,0 @CMakeFiles/crist-project.dir/linkLibs.rsp
