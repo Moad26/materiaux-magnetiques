@@ -51,6 +51,7 @@ Ensure Raylib is installed system-wide or linked appropriately in your build env
 
 ## Project Structure
 
+```plaintext
 crist-project/
 ├── CMakeLists.txt          # CMake configuration file
 ├── README.md               # Project documentation
@@ -94,6 +95,7 @@ crist-project/
     ├── simulation.cpp
     ├── simulation_ui.cpp
     └── users.txt           # Optional initial user file
+```
 
 ## File Descriptions
 
