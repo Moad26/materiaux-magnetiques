@@ -1,42 +1,43 @@
 #include "simulation.h"
 
+// Variables globales (conservées car partagées avec l'UI)
 SimulationState simState = SimulationState::PAUSED;
-float temperature = 2.5f;
-float J = 1.0f;
-float B = 0.0f;
-int stepsPerFrame = 100;
-bool showEnergy = false;
-Color upColor = RED;
-Color downColor = BLUE;
+float J = 1.0f;                // Couplage entre spins (reste global car souvent constant)
+Color upColor = RED;            // Couleur spin up
+Color downColor = BLUE;         // Couleur spin down
+bool showEnergy = false;        // Visualisation énergie
+
+/**
+ * @brief Crée un réseau cubique simple
+ * @param x,y,z Dimensions du réseau
+ * @param distance Distance interatomique
+ * @return Vecteur des atomes positionnés
+ */
 
 vector<Atome> make_cubic_struc(int x, int y, int z, float distance) {
-  vector<Atome> points(x * y * z);
-  auto getIndex = [=](int i, int j, int k) { return i * y * z + j * z + k; };
+    vector<Atome> points(x * y * z);
+    auto getIndex = [=](int i, int j, int k) { return i * y * z + j * z + k; };
 
-  for (int i = 0; i < x; i++) {
-    for (int j = 0; j < y; j++) {
-      for (int k = 0; k < z; k++) {
-        int idx = getIndex(i, j, k);
-        points[idx].pos = {i * distance, j * distance, k * distance};
-        points[idx].spin = GetRandomValue(0, 1) ? Spin::UP : Spin::DOWN;
+    for (int i = 0; i < x; i++) {
+        for (int j = 0; j < y; j++) {
+            for (int k = 0; k < z; k++) {
+                int idx = getIndex(i, j, k);
+                points[idx].pos = {i * distance, j * distance, k * distance};
+                points[idx].spin = GetRandomValue(0, 1) ? Spin::UP : Spin::DOWN;
 
-        if (i > 0)
-          points[idx].neigh.push_back(getIndex(i - 1, j, k));
-        if (i < x - 1)
-          points[idx].neigh.push_back(getIndex(i + 1, j, k));
-        if (j > 0)
-          points[idx].neigh.push_back(getIndex(i, j - 1, k));
-        if (j < y - 1)
-          points[idx].neigh.push_back(getIndex(i, j + 1, k));
-        if (k > 0)
-          points[idx].neigh.push_back(getIndex(i, j, k - 1));
-        if (k < z - 1)
-          points[idx].neigh.push_back(getIndex(i, j, k + 1));
-      }
+                // Connexions avec les 6 voisins
+                if (i > 0) points[idx].neigh.push_back(getIndex(i - 1, j, k));
+                if (i < x - 1) points[idx].neigh.push_back(getIndex(i + 1, j, k));
+                if (j > 0) points[idx].neigh.push_back(getIndex(i, j - 1, k));
+                if (j < y - 1) points[idx].neigh.push_back(getIndex(i, j + 1, k));
+                if (k > 0) points[idx].neigh.push_back(getIndex(i, j, k - 1));
+                if (k < z - 1) points[idx].neigh.push_back(getIndex(i, j, k + 1));
+            }
+        }
     }
-  }
-  return points;
+    return points;
 }
+
 
 vector<Atome> make_hexagonal_struc(int x, int y, int z, float distance) {
   vector<Atome> points;
@@ -454,32 +455,73 @@ void UpdateEnergies(vector<Atome> &structure, float J, float B) {
   }
 }
 
-void MonteCarloStep(vector<Atome> &structure, float temperature, float J,
-                    float B) {
-  int randomIdx = GetRandomValue(0, structure.size() - 1);
-  auto &atom = structure[randomIdx];
 
-  float currentEnergy = 0.0f;
-  for (int neighborIdx : atom.neigh) {
-    currentEnergy += static_cast<int>(structure[neighborIdx].spin);
-  }
-  currentEnergy = -J * static_cast<int>(atom.spin) * currentEnergy -
-                  B * static_cast<int>(atom.spin);
-
-  Spin newSpin = (atom.spin == Spin::UP) ? Spin::DOWN : Spin::UP;
-
-  float newEnergy = 0.0f;
-  for (int neighborIdx : atom.neigh) {
-    newEnergy += static_cast<int>(structure[neighborIdx].spin);
-  }
-  newEnergy = -J * static_cast<int>(newSpin) * newEnergy -
-              B * static_cast<int>(newSpin);
-
-  float deltaE = newEnergy - currentEnergy;
-
-  if (deltaE < 0 || (temperature > 0 && GetRandomValue(0, 10000) / 10000.0f <
-                                            exp(-deltaE / temperature))) {
-    atom.spin = newSpin;
-    UpdateEnergies(structure, J, B);
-  }
+/**
+ * @brief Met à jour les énergies de tous les atomes
+ * @param structure Vecteur des atomes
+ * @param params Paramètres de simulation
+ */
+void UpdateEnergies(vector<Atome> &structure, const SimulationParams &params) {
+    for (auto &atom : structure) {
+        float interactionEnergy = 0.0f;
+        for (int neighborIdx : atom.neigh) {
+            interactionEnergy += static_cast<int>(structure[neighborIdx].spin);
+        }
+        atom.energy = -J * static_cast<int>(atom.spin) * interactionEnergy 
+                       - params.B * static_cast<int>(atom.spin);
+    }
 }
+
+/**
+ * @brief Calcule l'énergie totale du système
+ * @param structure Vecteur des atomes
+ * @return Énergie totale (divisée par 2 pour éviter double comptage)
+ */
+float CalculateTotalEnergy(const vector<Atome> &structure) {
+    float totalEnergy = 0.0f;
+    for (const auto &atom : structure) {
+        totalEnergy += atom.energy;
+    }
+    return totalEnergy / 2.0f;
+}
+
+
+// Simulation MONTE CARLO //
+
+/**
+ * @brief Effectue un pas Monte Carlo
+ * @param structure Référence vers les atomes
+ * @param params Paramètres de simulation (température, champ B, etc.)
+ */
+void MonteCarloStep(vector<Atome> &structure, const SimulationParams &params) {
+    int randomIdx = GetRandomValue(0, structure.size() - 1);
+    auto &atom = structure[randomIdx];
+
+    // Calcul énergie actuelle
+    float currentEnergy = 0.0f;
+    for (int neighborIdx : atom.neigh) {
+        currentEnergy += static_cast<int>(structure[neighborIdx].spin);
+    }
+    currentEnergy = -J * static_cast<int>(atom.spin) * currentEnergy 
+                    - params.B * static_cast<int>(atom.spin);
+
+    // Test d'inversion de spin
+    Spin newSpin = (atom.spin == Spin::UP) ? Spin::DOWN : Spin::UP;
+    
+    float newEnergy = 0.0f;
+    for (int neighborIdx : atom.neigh) {
+        newEnergy += static_cast<int>(structure[neighborIdx].spin);
+    }
+    newEnergy = -J * static_cast<int>(newSpin) * newEnergy 
+                - params.B * static_cast<int>(newSpin);
+
+    float deltaE = newEnergy - currentEnergy;
+    // Critère de Metropolis
+    if (deltaE < 0 || (params.temperature > 0 && 
+        GetRandomValue(0, 10000)/10000.0f < exp(-deltaE/params.temperature))) {
+        atom.spin = newSpin;
+    }
+}
+
+
+

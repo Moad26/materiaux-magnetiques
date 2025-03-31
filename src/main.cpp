@@ -4,26 +4,33 @@
 #include "simulation_ui.h"
 
 int main() {
-  // Initialize window
+  // Initialisation fenêtre en plein écran
   int monitor = GetCurrentMonitor();
   int screenWidth = GetMonitorWidth(monitor);
   int screenHeight = GetMonitorHeight(monitor);
 
-  // Borderless window at monitor size
-  InitWindow(screenWidth, screenHeight, "3D Ising Model Simulation");
-  SetWindowPosition(screenWidth / 2, screenHeight / 2);
-  SetTargetFPS(60);
-  rlImGuiSetup(true);
+  // Configuration initiale des paramètres de simulation
+  SimulationParams simParams;
+  simParams.temperature = 2.5f;   // Température par défaut
+  simParams.B = 0.1f;            // Petit champ magnétique initial
+  simParams.stepsPerFrame = 100; // Nombre raisonnable de pas MC
 
-  // User data
+  // Création fenêtre borderless
+  InitWindow(screenWidth, screenHeight, "3D Ising Model Simulation");
+  SetWindowPosition(0, 0);  // Position en haut à gauche
+  SetTargetFPS(60);         // Synchronisation verticale
+  rlImGuiSetup(true);       // Initialisation ImGui
+
+  // Authentification utilisateur
   bool logged_in = runAuthentication();
-  // Clean up ImGui and close window before starting simulation
+
+  // Nettoyage après authentification
   rlImGuiShutdown();
   CloseWindow();
 
-  // Run simulation only if logged in
+  // Si authentification réussie, lancer la simulation avec les paramètres
   if (logged_in) {
-    runSimulation();
+    runSimulation(simParams);  // Passage des paramètres initiaux
   }
 
   return 0;
