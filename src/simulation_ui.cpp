@@ -1,5 +1,11 @@
 #include "simulation_ui.h"
+#include "imgui.h"
 #include "imgui_style.h"
+#include "simulation.h"
+#include <algorithm>
+#include <cstddef>
+#include <deque>
+using namespace std;
 
 int runSimulation() {
   // Configuration de la fenêtre
@@ -32,6 +38,9 @@ int runSimulation() {
   Vector2 cameraAngle = {0};
   float movementSpeed = 10.0f;
   float cameraSensitivity = 0.3f;
+  deque<float> energyHistory;
+  const size_t maxHistoryPoints = 500;
+  bool showEnergyGraph = false;
 
   // Structure type
   StructureType currentStructure = StructureType::CUBIC;
@@ -290,6 +299,7 @@ int runSimulation() {
     ImGui::SliderFloat("Magnetic Field (B)", &B, -2.0f, 2.0f);
     ImGui::SliderInt("Steps/Frame", &stepsPerFrame, 1, 1000);
     ImGui::Checkbox("Show Energy", &showEnergy);
+    ImGui::Checkbox("Show Energy Graph", &showEnergyGraph);
 
     // Color controls
     float upColorArray[3] = {upColor.r / 255.0f, upColor.g / 255.0f,
@@ -316,12 +326,69 @@ int runSimulation() {
 
     // Simulation stats
     float totalEnergy = CalculateTotalEnergy(structure);
+    if (simState == SimulationState::RUNNING ||
+        simState == SimulationState::STEP) {
+      UpdateEnergyHistory(energyHistory, totalEnergy, maxHistoryPoints);
+    }
     int upSpins = 0, downSpins = 0;
     for (const auto &atom : structure) {
       if (atom.spin == Spin::UP)
         upSpins++;
       else
         downSpins++;
+    }
+    if (showEnergyGraph && !energyHistory.empty()) {
+      ImGui::Separator();
+      ImGui::Text("Energy Evolution");
+      // Only update min/max if simulation is running
+      static float pausedMinEnergy = 0;
+      static float pausedMaxEnergy = 0;
+
+      if (simState == SimulationState::RUNNING ||
+          simState == SimulationState::STEP) {
+        if (!energyHistory.empty()) {
+          pausedMinEnergy =
+              *std::min_element(energyHistory.begin(), energyHistory.end());
+          pausedMaxEnergy =
+              *std::max_element(energyHistory.begin(), energyHistory.end());
+        }
+      }
+
+      float rangePadding = (pausedMaxEnergy - pausedMinEnergy) * 0.1f;
+      float graphMin = pausedMinEnergy - rangePadding;
+      float graphMax = pausedMaxEnergy + rangePadding;
+
+      // Convert deque to vector for plotting
+      std::vector<float> plotData(energyHistory.begin(), energyHistory.end());
+
+      // Create axis labels
+      std::string yLabel = "Energy (" + std::to_string((int)graphMin) + " to " +
+                           std::to_string((int)graphMax) + ")";
+
+      // Draw the plot
+      ImGui::PlotLines(yLabel.c_str(),  // Y-axis label with range
+                       plotData.data(), // Data
+                       plotData.size(), // Count
+                       0,               // Offset
+                       nullptr,         // Overlay text
+                       graphMin,        // Scale min
+                       graphMax,        // Scale max
+                       ImVec2(0, 150)   // Larger size for better visibility
+      );
+
+      // Add X-axis label
+      ImGui::Text("Simulation Steps");
+
+      // Display current values
+      if (!energyHistory.empty()) {
+        ImGui::Text("Current: %.2f | Min: %.2f | Max: %.2f",
+                    energyHistory.back(), pausedMinEnergy, pausedMaxEnergy);
+      }
+
+      // Show pause status
+      if (simState == SimulationState::PAUSED) {
+        ImGui::TextColored(ImVec4(1, 1, 0, 1), "(PAUSED)");
+      }
     }
 
     ImGui::Text("Total Energy: %.2f", totalEnergy);

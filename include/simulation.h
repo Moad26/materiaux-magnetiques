@@ -1,11 +1,11 @@
 #ifndef SIMULATION_H
 #define SIMULATION_H
-
 #include "imgui.h"
 #include "raylib.h"
 #include "raymath.h"
 #include "rlImGui.h"
 #include "rlgl.h"
+#include <deque>
 #include <vector>
 
 using namespace std;
@@ -141,4 +141,6 @@ void MonteCarloStep(vector<Atome> &structure, float temperature, float J,
  * @param params Paramètres de simulation actuels
  */
 
+void UpdateEnergyHistory(deque<float> &energyHistory, float currentEnergy,
+                         size_t maxHistoryPoints);
 #endif // SIMULATION_H

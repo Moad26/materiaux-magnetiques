@@ -1,4 +1,6 @@
 #include "simulation.h"
+#include <cstddef>
+#include <deque>
 
 // Variables globales (conservées car partagées avec l'UI)
 SimulationState simState = SimulationState::PAUSED;
@@ -506,5 +508,14 @@ void MonteCarloStep(vector<Atome> &structure, float temperature, float J,
                                             exp(-deltaE / temperature))) {
     atom.spin = newSpin;
     UpdateEnergies(structure, J, B);
+  }
+}
+
+void UpdateEnergyHistory(deque<float> &energyHistory, float currentEnergy,
+                         size_t maxHistoryPoints) {
+  energyHistory.push_back(currentEnergy);
+  // Keep history size manageable
+  if (energyHistory.size() > maxHistoryPoints) {
+    energyHistory.pop_front();
   }
 }
