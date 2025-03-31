@@ -257,7 +257,7 @@ $$E_i = -J \cdot s_i \cdot \sum_{j \in \text{neighbors}} s_j - B \cdot s_i$$
 
 ### Monte Carlo Simulation
 
-- Random spin flip, accepted if \( \Delta E < 0 \) or \( e^{-\Delta E / T} > \text{random}(0,1) \).
+- Random spin flip, accepted if $\Delta E < 0 $ or $e^{-\Delta E / T} > \text{random}(0,1)$.
 
 ## Future Improvements
 
