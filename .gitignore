@@ -1,12 +1,64 @@
-CMakeLists.txt.user
-CMakeCache.txt
-CMakeFiles
-CMakeScripts
-Testing
-Makefile
-cmake_install.cmake
-install_manifest.txt
+# CMake build artifacts
+/build/
+/CMakeCache.txt
+/CMakeFiles/
+/CMakeScripts/
+/Testing/
+/Makefile
+/cmake_install.cmake
+/install_manifest.txt
+/compile_commands.json
+/CTestTestfile.cmake
+/_deps
+
+# CMake user presets
+/CMakeUserPresets.json
+
+# Compiler and IDE files
+*.o
+*.obj
+*.so
+*.dll
+*.exe
+*.a
+*.lib
+*.lo
+*.la
+*.dylib
+*.pdb  # Debug symbols
+*.ilk  # Incremental linking files
+
+# ImGui generated configs (if modified during runtime)
+imgui.ini
+
+.cache/clangd/index
+.ccls-cache/
+.clangd
+.ccls
+
+# Ignore CMake API reply files
+.cmake/api/v1/reply
+
+# Dependency directories
+/deps/
+/vendor/
+/external/
+
+# Backup and temporary files
+*.swp
+*.swo
+*~
+*.bak
+*.tmp
+
+# Compilation database (if generated)
 compile_commands.json
-CTestTestfile.cmake
-_deps
-CMakeUserPresets.json
+
+# IDE-specific files
+.vscode/
+.idea/
+*.sln
+*.vcxproj*
+*.ncb
+*.suo
+*.user
