@@ -41,3 +41,9 @@ make -j$(nproc)
 
 echo "Build completed! Windows executable is in dist/windows folder."
 cd ..
+
+# Create a ZIP archive of the Windows directory
+echo "Creating ZIP archive of Windows build..."
+zip -r dist/windows.zip dist/windows
+
+echo "ZIP archive created: dist/windows.zip"
