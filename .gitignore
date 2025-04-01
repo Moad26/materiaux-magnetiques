@@ -1,4 +1,5 @@
 # CMake build artifacts
+/build-windows/
 /build/
 /CMakeCache.txt
 /CMakeFiles/
